@@ -17,7 +17,8 @@ To build all dependencies, run [`build-deps.bash`](build-deps.bash) script in
 project's root directory. This script will install dependencies to `_deps`
 subdirectory in the project's root directory (NOT globally).
 
-Then build the config and project with [`build.bash`](build.bash) script.
+Edit the [`config.c`](config.c) file. Then build the config and project with
+[`build.bash`](build.bash) script.
 
 ### Build notes
 This project uses [Unity Build](https://en.wikipedia.org/wiki/Unity_build). In
@@ -26,3 +27,10 @@ order to build SSC, you just need a C compiler and nothing else! You can build
 ```bash
 cc -std=gnu99 -O2 -DNDEBUG -o 'ssc-local' 'src/local_build.c'
 ```
+
+## Run
+Run the shadowsocks client implementation (`ssc-local`):
+```bash
+./_build/ssc-local ./_build/config.so
+```
+If you change the configuration, you must compile `config.c` to `config.so` file again.
