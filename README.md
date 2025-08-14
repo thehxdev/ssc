@@ -7,11 +7,21 @@ as described in [SIP022](https://shadowsocks.org/doc/sip022.html).
 > error/event handling. In order to use Shadowsocks, checkout
 > [shadowsocks-rust](https://github.com/shadowsocks/shadowsocks-rust).
 
+## Unique features
+- No malloc/free (at least for now). All memory is managed by a single Arena
+and some Pool allocators. EVERY allocation, IS reusabel thanks to pool allocators.
+This keeps memory usage low and avoids memory fragmentation.
+
+- The config is a single `.c` file that compiles to a `.so` (on unix) or `.dll`
+(on windows) and loaded on runtime.
+
+- Unity Build! Build the project with JUST the C compiler and a single command.
+
 ## Build
 SSC dependes on these projects:
-- LibUV: as event loop implementation
-- OpenSSL: used for encryption/decryption
-- BLAKE3: used for sub-key derivation with random salt
+- LibUV: As event loop implementation
+- OpenSSL: For encryption/decryption
+- BLAKE3: For sub-key derivation with random salt
 
 To build all dependencies, run [`build-deps.bash`](build-deps.bash) script in
 project's root directory. This script will install dependencies to `_deps`

@@ -3,6 +3,9 @@
 // This is the config file for ssc Shadowsocks implementation. Users must
 // compile this config file to a shared object file (.so on unix and .dll on
 // windows)
+//
+// build command:
+// $ cc -fPIC -shared -o config.so config.c
 
 // socks5 listening address
 const char listen_addr[] = "127.0.0.1";
