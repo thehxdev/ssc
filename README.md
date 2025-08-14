@@ -9,7 +9,7 @@ as described in [SIP022](https://shadowsocks.org/doc/sip022.html).
 
 ## Unique features
 - No malloc/free (at least for now). All memory is managed by a single Arena
-and some Pool allocators. EVERY allocation, IS reusabel thanks to pool allocators.
+and some Pool allocators. EVERY allocation, IS reusable thanks to pool allocators.
 This keeps memory usage low and avoids memory fragmentation.
 
 - The config is a single `.c` file that compiles to a `.so` (on unix) or `.dll`
