@@ -1,0 +1,9 @@
+_deps/
+_build/
+.cache/
+keys/
+*.pem
+*.so
+compile_commands.json
+compile_flags.txt
+tags
