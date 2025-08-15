@@ -46,7 +46,7 @@ build_blake3() {
     fi
     cd "$source_dir/c"
     mkdir -p build && cd build
-    cmake .. \
+    cmake --fresh .. \
         -DCMAKE_INSTALL_PREFIX="$DEPS_PATH" \
         -DBLAKE3_EXAMPLES=0 -DBLAKE3_USE_TBB=0 \
         -DCMAKE_BUILD_TYPE=$CMAKE_BUILD_TYPE
@@ -59,9 +59,9 @@ build_libuv() {
     local source_dir='libuv-source'
     local archive="libuv-$version.tar.gz"
     cd "$DEPS_PATH"
-    if [[ -e "$source_dir" ]]; then
-        return 0
-    fi
+    # if [[ -e "$source_dir" ]]; then
+    #     return 0
+    # fi
     if [[ ! -e "$archive" ]]; then
         curl -L -# \
             -o "$archive" \
@@ -72,7 +72,7 @@ build_libuv() {
     tar -xzf "$archive" -C "$source_dir" --strip-components=1 || exit 1
     cd "$source_dir"
     mkdir -p build && cd build
-    cmake .. \
+    cmake --fresh .. \
         -DCMAKE_INSTALL_PREFIX="$DEPS_PATH" \
         -DLIBUV_BUILD_TESTS=OFF -DLIBUV_BUILD_BENCH=OFF \
         -DCMAKE_BUILD_TYPE=$CMAKE_BUILD_TYPE
