@@ -1,19 +1,12 @@
-#include <stdio.h>
-#include <dlfcn.h>
-#include <string.h>
-#include <unistd.h>
-
 #define __dlsym_ex(handle, name) \
-    tmp = dlsym((handle), (name)); \
-    if (!tmp) { \
-        fprintf(stderr, "%s\n", dlerror()); \
-        goto ret_close_handle; \
-    }
+    tmp = os_dlsym((handle), (name)); \
+    if (!tmp) \
+        goto ret_close_handle;
 
 int ssc_config_readall(arena_t *arena, const char *dlpath, struct ssc_config *config) {
     int ok = 0, i;
     void *handle, *tmp;
-    handle = dlopen(dlpath, RTLD_LAZY);
+    handle = os_dlopen(dlpath);
     if (!handle) {
         fprintf(stderr, "%s\n", dlerror());
         goto ret;
@@ -41,7 +34,7 @@ int ssc_config_readall(arena_t *arena, const char *dlpath, struct ssc_config *co
 
     ok = 1;
 ret_close_handle:
-    dlclose(handle);
+    os_dlclose(handle);
 ret:
     return ok;
 }
