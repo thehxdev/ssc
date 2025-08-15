@@ -35,7 +35,11 @@ This project uses [Unity Build](https://en.wikipedia.org/wiki/Unity_build). In
 order to build SSC, you just need a C compiler and nothing else! You can build
 `ssc-local` executable with this simple command even without the build script:
 ```bash
-cc -std=gnu99 -O2 -DNDEBUG -o 'ssc-local' 'src/local_build.c'
+cc -std=gnu99 \
+    -I_deps/include -Isrc -L_deps/lib \
+    -O2 -DNDEBUG -o 'ssc-local' \
+    'src/local_build.c' \
+    -l:libuv.a -l:libcrypto.a -l:libblake3.a
 ```
 
 ## Run
