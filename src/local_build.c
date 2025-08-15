@@ -1,3 +1,4 @@
+#include "os/os.h"
 #include "base/base.h"
 #include "base/arena.h"
 #include "base/mempool.h"
@@ -7,6 +8,7 @@
 #include "socks5.h"
 #include "ssc.h"
 
+#include "os/os.c"
 #include "base/arena.c"
 #include "base/mempool.c"
 #include "base64.c"
