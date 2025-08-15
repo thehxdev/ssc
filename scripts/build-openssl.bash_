@@ -1,0 +1,27 @@
+version='3.5.1'
+archive="openssl-$version.tar.gz"
+source_dir="openssl-source"
+
+cd "$DEPS_PATH"
+
+if [[ -e "$source_dir" ]]; then
+    exit 0
+fi
+
+if [[ ! -e "$archive" ]]; then
+    curl -L -# \
+        -o "$archive" \
+        "https://github.com/openssl/openssl/releases/download/openssl-$version/$archive" \
+        || exit 1
+fi
+
+mkdir -p "$source_dir"
+tar -xzf "$archive" -C "$source_dir" --strip-components=1 || exit 1
+
+cd "$source_dir"
+./Configure \
+    --prefix="$DEPS_PATH" \
+    --release \
+    no-deprecated
+
+make -j$(nproc) && make install
