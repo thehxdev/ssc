@@ -43,8 +43,6 @@ build_blake3() {
     if [[ ! -e "$source_dir" ]]; then
         git clone --depth=1 --branch=$version \
             'https://github.com/BLAKE3-team/BLAKE3' "$source_dir" || exit 1
-    else
-        return 0
     fi
     cd "$source_dir/c"
     mkdir -p build && cd build
