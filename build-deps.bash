@@ -9,6 +9,8 @@ set -x
 ROOT_PATH=$(dirname "$(realpath "$0")")
 DEPS_PATH="$ROOT_PATH/_deps"
 
+CMAKE_BUILD_TYPE=Debug
+
 build_openssl() {
     local version='3.5.1'
     local archive="openssl-$version.tar.gz"
@@ -49,7 +51,7 @@ build_blake3() {
     cmake .. \
         -DCMAKE_INSTALL_PREFIX="$DEPS_PATH" \
         -DBLAKE3_EXAMPLES=0 -DBLAKE3_USE_TBB=0 \
-        -DCMAKE_BUILD_TYPE=Release
+        -DCMAKE_BUILD_TYPE=$CMAKE_BUILD_TYPE
     make -j$(nproc) && make install
     cd "$ROOT_PATH"
 }
@@ -74,8 +76,8 @@ build_libuv() {
     mkdir -p build && cd build
     cmake .. \
         -DCMAKE_INSTALL_PREFIX="$DEPS_PATH" \
-        -DCMAKE_BUILD_TYPE=Release \
-        -DLIBUV_BUILD_TESTS=OFF -DLIBUV_BUILD_BENCH=OFF
+        -DLIBUV_BUILD_TESTS=OFF -DLIBUV_BUILD_BENCH=OFF \
+        -DCMAKE_BUILD_TYPE=$CMAKE_BUILD_TYPE
     make -j$(nproc) && make install
     cd "$ROOT_PATH"
 }
