@@ -216,25 +216,25 @@ static void client_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *r
             // begin variable-length header
             //////
             ptr = 0;
-            unsigned char *tmpbuf = arena_alloc(gmem, vheader_length);
+            unsigned char *vheader = arena_alloc(gmem, vheader_length);
 
             // set destination address type, address and port in variable-length header
-            memcpy(&tmpbuf[ptr], s->tmpbuf, s->tmppos);
+            memcpy(&vheader[ptr], s->tmpbuf, s->tmppos);
             ptr += s->tmppos;
             s->tmppos = 0;
 
             // set padding length
-            *((uint16_t*)&tmpbuf[ptr]) = htobe16(padding_length);
+            *((uint16_t*)&vheader[ptr]) = htobe16(padding_length);
             ptr += sizeof(uint16_t) + padding_length;
 
             // write initial payload
-            memcpy(&tmpbuf[ptr], rdbuf->base, nread);
+            memcpy(&vheader[ptr], rdbuf->base, nread);
             assert((ptr + nread) == vheader_length);
 
             ok = ssc_crypto_encrypt(&s->crypto,
                                     &wrreq->buf.base[wrreq->buf.len], &encrypted_size,
                                     &wrreq->buf.base[wrreq->buf.len + vheader_length], TAG_SIZE,
-                                    tmpbuf, vheader_length,
+                                    vheader, vheader_length,
                                     NULL, 0);
             assert(ok);
             assert(encrypted_size == vheader_length);
