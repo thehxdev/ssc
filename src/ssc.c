@@ -8,7 +8,7 @@ int ssc_config_readall(arena_t *arena, const char *dlpath, struct ssc_config *co
     void *handle, *tmp;
     handle = os_dlopen(dlpath);
     if (!handle) {
-        fprintf(stderr, "%s\n", dlerror());
+        fprintf(stderr, "%s\n", os_dlerror());
         goto ret;
     }
 

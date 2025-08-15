@@ -11,3 +11,7 @@ void *os_dlsym(dl_handle_t handle, const char *symbol) {
 void os_dlclose(dl_handle_t handle) {
     dlclose(handle);
 }
+
+char *os_dlerror(void) {
+    return dlerror();
+}

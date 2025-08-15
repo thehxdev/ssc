@@ -15,4 +15,6 @@ void *os_dlsym(dl_handle_t handle, const char *symbol);
 
 void os_dlclose(dl_handle_t handle);
 
+char *os_dlerror(void);
+
 #endif // _SSC_OS_CORE_H_
