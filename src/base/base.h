@@ -3,13 +3,25 @@
 
 #define unused(v) ((void)(v))
 
-#define trap_assert(cond) \
-    do { \
-        if (!(cond)) { \
-            fprintf(stderr, "trap_assert(" #cond ")"); \
-            *(volatile char*)0; \
-        } \
-    } while (0)
+#if defined(__GNUC__) || defined(__clang__)
+    #define TRAP __builtin_trap()
+#elif defined (_MCS_VER)
+    #define TRAP __debugbreak()
+#else
+    #define TRAP (*(volatile char*)0)
+#endif
+
+#ifdef NDEBUG
+    #define trap_assert(cond)
+#else
+    #define trap_assert(cond) \
+        do { \
+            if (!(cond)) { \
+                fprintf(stderr, "trap_assert(" #cond ")"); \
+                TRAP; \
+            } \
+        } while (0)
+#endif
 
 // align up a number to a power-of-2 alignment
 #define ALIGN_POW2(num, alignment) \
