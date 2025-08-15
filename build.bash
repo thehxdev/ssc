@@ -10,9 +10,17 @@ DEPS_PATH="$SELF_PATH/_deps"
 BUILD_PATH="$SELF_PATH/_build"
 SRC_PATH="$SELF_PATH/src"
 
-CFLAGS=(-std=gnu99 -Wall -Wextra -Wshadow -O3 -DNDEBUG)
+BUILD_TYPE="Release"
+
+CFLAGS=(-std=gnu99 -Wall -Wextra -Wshadow)
 LDFLAGS=()
 LIBS=(-l:libev.a -l:libblake3.a -l:libcrypto.a -ldl)
+
+if [[ "$BUILD_TYPE" = "Release" ]]; then
+    CFLAGS+=(-O3 -DNDEBUG)
+else
+    CFLAGS+=(-Og -g3)
+fi
 
 if [[ -z $CC ]]; then
     CC=cc

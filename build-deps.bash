@@ -9,7 +9,7 @@ set -x
 ROOT_PATH=$(dirname "$(realpath "$0")")
 DEPS_PATH="$ROOT_PATH/_deps"
 
-CMAKE_BUILD_TYPE=Debug
+CMAKE_BUILD_TYPE=Release
 
 build_openssl() {
     local version='3.5.1'
