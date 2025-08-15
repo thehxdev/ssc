@@ -77,7 +77,7 @@ static const uint8_t map2[256] =
     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 };
 
-union unaligned_32 { uint32_t l; } __attribute__((packed, may_alias));
+union __base64_unaligned_32 { uint32_t l; } __attribute__((packed, may_alias));
 
 #define BASE64_DEC_STEP(i) do { \
     bits = map2[in[i]]; \
@@ -86,10 +86,10 @@ union unaligned_32 { uint32_t l; } __attribute__((packed, may_alias));
     v = i ? (v << 6) + bits : bits; \
 } while(0)
 
-#define bswap16(x) (((x) << 8 & 0xff00)  | ((x) >> 8 & 0x00ff))
-#define bswap32(x) (bswap16(x) << 16 | bswap16((x) >> 16))
+#define __base64_bswap16(x) (((x) << 8 & 0xff00)  | ((x) >> 8 & 0x00ff))
+#define __base64_bswap32(x) (__base64_bswap16(x) << 16 | __base64_bswap16((x) >> 16))
 
-#define wn32(p, v) ((((union unaligned_32*) (p))->l) = (v))
+#define __base64_wn32(p, v) ((((union __base64_unaligned_32*) (p))->l) = (v))
 
 int base64_decode(uint8_t *out, size_t out_size, const char *in_str)
 {
@@ -109,8 +109,8 @@ int base64_decode(uint8_t *out, size_t out_size, const char *in_str)
         BASE64_DEC_STEP(1);
         BASE64_DEC_STEP(2);
         BASE64_DEC_STEP(3);
-        v = bswap32(v << 8);
-        wn32(dst, v);
+        v = __base64_bswap32(v << 8);
+        __base64_wn32(dst, v);
         dst += 3;
         in += 4;
     }
@@ -168,7 +168,7 @@ char *base64_encode(char *out, size_t out_size, const uint8_t *in, size_t in_siz
         return NULL;
     ret = dst = out;
     while (bytes_remaining > 3) {
-        i_bits = bswap32(((const union unaligned_32*)in)->l);
+        i_bits = __base64_bswap32(((const union __base64_unaligned_32*)in)->l);
         in += 3; bytes_remaining -= 3;
         *dst++ = b64[i_bits>>26];
         *dst++ = b64[(i_bits>>20) & 0x3F];
