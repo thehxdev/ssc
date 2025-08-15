@@ -195,7 +195,7 @@ static void client_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *r
             ptr += sizeof(uint64_t);
 
             // set length field (variable-length header length) in fixed-length header
-            long padding_length = random() & 0xFF;
+            long padding_length = (random() % 900) + 1;
             long vheader_length = s->dstsize + sizeof(uint16_t) + padding_length + nread;
             assert(vheader_length <= UINT16_MAX);
             *((uint16_t*)&fheader[ptr]) = htobe16((uint16_t) vheader_length);
