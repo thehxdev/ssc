@@ -29,12 +29,10 @@ typedef struct ssc_session {
     int client_stage, remote_stage;
     unsigned char salt[AES_MAX_KEY_SIZE];
     char socksreply[10];
-    char dstaddr[260];
-    size_t dstsize;
-
     long mustread;
+    // temporary buffer
     long tmppos;
-    char tmpbuf[0];
+    char tmpbuf[BUFFER_SIZE];
 } ssc_session_t;
 
 // global memory - no malloc/free hell!
@@ -160,8 +158,8 @@ static void client_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *r
                 goto ret;
             }
 
-            s->dstsize = nread - 3;
-            memcpy(s->dstaddr, &rdbuf->base[3], nread - 3);
+            memcpy(s->tmpbuf, &rdbuf->base[3], nread - 3);
+            s->tmppos = nread - 3;
 
             uv_tcp_connect(&s->conreq, &s->remote, (struct sockaddr*) &remaddr,
                            remote_connect_cb);
@@ -196,7 +194,7 @@ static void client_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *r
 
             // set length field (variable-length header length) in fixed-length header
             long padding_length = (random() % 900) + 1;
-            long vheader_length = s->dstsize + sizeof(uint16_t) + padding_length + nread;
+            long vheader_length = s->tmppos + sizeof(uint16_t) + padding_length + nread;
             assert(vheader_length <= UINT16_MAX);
             *((uint16_t*)&fheader[ptr]) = htobe16((uint16_t) vheader_length);
 
@@ -221,8 +219,9 @@ static void client_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *r
             unsigned char *tmpbuf = arena_alloc(gmem, vheader_length);
 
             // set destination address type, address and port in variable-length header
-            memcpy(&tmpbuf[ptr], s->dstaddr, s->dstsize);
-            ptr += s->dstsize;
+            memcpy(&tmpbuf[ptr], s->tmpbuf, s->tmppos);
+            ptr += s->tmppos;
+            s->tmppos = 0;
 
             // set padding length
             *((uint16_t*)&tmpbuf[ptr]) = htobe16(padding_length);
@@ -540,7 +539,7 @@ int main(int argc, char *argv[]) {
         goto ret;
 
     ssc_mempool_init(&bufpool, gmem, BUFFER_SIZE);
-    ssc_mempool_init(&session_pool, gmem, sizeof(ssc_session_t) + BUFFER_SIZE);
+    ssc_mempool_init(&session_pool, gmem, sizeof(ssc_session_t));
     ssc_mempool_init(&wrreq_pool, gmem, sizeof(ssc_write_req_t));
 
     struct ssc_config config;
