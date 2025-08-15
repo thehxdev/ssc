@@ -3,6 +3,14 @@
 
 #define unused(v) ((void)(v))
 
+#define trap_assert(cond) \
+    do { \
+        if (!(cond)) { \
+            fprintf(stderr, "trap_assert(" #cond ")"); \
+            *(volatile char*)0; \
+        } \
+    } while (0)
+
 // align up a number to a power-of-2 alignment
 #define ALIGN_POW2(num, alignment) \
     ((((arena_uintptr_t)num) + ((alignment) - 1)) & (~((alignment) - 1)))

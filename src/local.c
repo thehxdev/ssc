@@ -1,11 +1,3 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
-#include <assert.h>
-#include <endian.h>
-#include <arpa/inet.h>
-#include <sys/socket.h>
 #include <uv.h>
 
 #define BUFFER_SIZE 0x10021
@@ -22,6 +14,9 @@ enum {
     REMOTE_STAGE_PROXY
 };
 
+#undef assert
+#define assert trap_assert
+
 typedef struct ssc_write_req {
     uv_write_t req;
     uv_buf_t buf;
@@ -36,6 +31,10 @@ typedef struct ssc_session {
     char socksreply[10];
     char dstaddr[260];
     size_t dstsize;
+
+    long mustread;
+    long tmppos;
+    char tmpbuf[0];
 } ssc_session_t;
 
 // global memory - no malloc/free hell!
@@ -310,6 +309,9 @@ static void remote_read_cb(uv_stream_t *remote, ssize_t nread, const uv_buf_t *r
         goto failed;
     }
 
+    if (nread == 0)
+        goto ret;
+
     long ok, decrypted_size = 0;
     uint16_t payload_length = 0, ptr;
     ssc_write_req_t *wrreq;
@@ -349,7 +351,6 @@ static void remote_read_cb(uv_stream_t *remote, ssize_t nread, const uv_buf_t *r
                                     NULL, 0);
             assert(ok);
             assert(payload_length == wrreq->buf.len);
-            assert((ptr + payload_length + TAG_SIZE) == nread);
 
             uv_write((uv_write_t*) wrreq, (uv_stream_t*) &s->client,
                      &wrreq->buf, 1, wrreq_put_buf_cb);
@@ -360,28 +361,16 @@ static void remote_read_cb(uv_stream_t *remote, ssize_t nread, const uv_buf_t *r
         break;
 
         case REMOTE_STAGE_PROXY: {
-            if (nread <= 18) {
-                LOGE("length chunk is not followed by a payload chunk\n");
-                goto failed;
-            }
-            long offset;
+            // if (nread <= 18) {
+            //     LOGE("length chunk is not followed by a payload chunk (nread = %ld)\n", nread);
+            //     goto ret;
+            // }
             char *base = rdbuf->base;
-            do {
-                ok = ssc_crypto_decrypt(&s->crypto,
-                                        &payload_length, &decrypted_size,
-                                        base, sizeof(uint16_t),
-                                        &base[sizeof(uint16_t)], TAG_SIZE,
-                                        NULL, 0);
-                if (!ok) {
-                    LOGE("decrypt length chunk failed (nread = %ld)\n", nread);
-                    ssc_crypto_hexdump(base, nread);
-                    goto failed;
-                }
-                assert(ok);
-                assert(decrypted_size == sizeof(uint16_t));
+            assert(nread >= s->mustread);
+            if (s->mustread != 0) {
+                memcpy(&s->tmpbuf[s->tmppos], base, s->mustread);
 
-                ptr = sizeof(uint16_t) + TAG_SIZE;
-                payload_length = ntohs(payload_length);
+                s->tmppos += s->mustread;
 
                 wrreq = ssc_mempool_get(&wrreq_pool);
                 wrreq->buf = (uv_buf_t){
@@ -391,8 +380,55 @@ static void remote_read_cb(uv_stream_t *remote, ssize_t nread, const uv_buf_t *r
 
                 ok = ssc_crypto_decrypt(&s->crypto,
                                         wrreq->buf.base, (long*) &wrreq->buf.len,
-                                        &base[ptr], payload_length,
-                                        &base[ptr + payload_length], TAG_SIZE,
+                                        s->tmpbuf, s->tmppos - TAG_SIZE,
+                                        &s->tmpbuf[s->tmppos - TAG_SIZE], TAG_SIZE,
+                                        NULL, 0);
+                assert(ok);
+                assert(wrreq->buf.len == (s->tmppos - TAG_SIZE));
+
+                uv_write((uv_write_t*) wrreq, (uv_stream_t*) &s->client,
+                         &wrreq->buf, 1, wrreq_put_buf_cb);
+
+                nread -= s->mustread;
+                base += s->mustread;
+
+                s->mustread = 0;
+                s->tmppos = 0;
+            }
+            while (nread != 0) {
+                ok = ssc_crypto_decrypt(&s->crypto,
+                                        &payload_length, &decrypted_size,
+                                        base, sizeof(uint16_t),
+                                        &base[sizeof(uint16_t)], TAG_SIZE,
+                                        NULL, 0);
+                if (!ok) {
+                    LOGE("decrypt length chunk failed (nread = %ld)\n", nread);
+                    goto failed;
+                }
+                assert(ok);
+                assert(decrypted_size == sizeof(uint16_t));
+                nread -= sizeof(uint16_t) + TAG_SIZE;
+                base += sizeof(uint16_t) + TAG_SIZE;
+
+                payload_length = ntohs(payload_length);
+                if (payload_length + TAG_SIZE > nread) {
+                    s->mustread = (payload_length + TAG_SIZE) - nread;
+                    memcpy(s->tmpbuf, base, nread);
+                    s->tmppos = nread;
+                    goto ret;
+                }
+                // assert(nread >= (payload_length + TAG_SIZE));
+
+                wrreq = ssc_mempool_get(&wrreq_pool);
+                wrreq->buf = (uv_buf_t){
+                    .base = ssc_mempool_get(&bufpool),
+                    .len  = 0
+                };
+
+                ok = ssc_crypto_decrypt(&s->crypto,
+                                        wrreq->buf.base, (long*) &wrreq->buf.len,
+                                        base, payload_length,
+                                        &base[payload_length], TAG_SIZE,
                                         NULL, 0);
                 assert(ok);
                 assert(wrreq->buf.len == payload_length);
@@ -400,10 +436,9 @@ static void remote_read_cb(uv_stream_t *remote, ssize_t nread, const uv_buf_t *r
                 uv_write((uv_write_t*) wrreq, (uv_stream_t*) &s->client,
                          &wrreq->buf, 1, wrreq_put_buf_cb);
                 LOGI("wrote %ld bytes from remote to client\n", wrreq->buf.len);
-                offset = sizeof(uint16_t) + (2 * TAG_SIZE) + payload_length;
-                nread -= offset;
-                base += offset;
-            } while (nread != 0);
+                nread -= payload_length + TAG_SIZE;
+                base += payload_length + TAG_SIZE;
+            }
         }
         break;
     }
@@ -500,12 +535,12 @@ int main(int argc, char *argv[]) {
     arena_config_t aconf = ARENA_DEFAULT_CONFIG;
     aconf.flags   = ARENA_FIXED;
     aconf.reserve = ARENA_MB(128ULL);
-    aconf.commit  = ARENA_MB(8ULL);
+    aconf.commit  = ARENA_MB(16ULL);
     if ( !(gmem = arena_new(&aconf)))
         goto ret;
 
     ssc_mempool_init(&bufpool, gmem, BUFFER_SIZE);
-    ssc_mempool_init(&session_pool, gmem, sizeof(ssc_session_t));
+    ssc_mempool_init(&session_pool, gmem, sizeof(ssc_session_t) + BUFFER_SIZE);
     ssc_mempool_init(&wrreq_pool, gmem, sizeof(ssc_write_req_t));
 
     struct ssc_config config;
