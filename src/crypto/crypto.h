@@ -23,7 +23,7 @@ typedef struct ssc_crypto {
     unsigned char dec_iv[IV_SIZE];
 } ssc_crypto_t;
 
-void *ssc_crypto_cipher_fetch(const char *method, unsigned char *keysize_out);
+ssc_crypto_cipher *ssc_crypto_cipher_fetch(const char *method, unsigned char *keysize_out);
 
 void ssc_crypto_cipher_free(ssc_crypto_cipher *cipher);
 

@@ -1,5 +1,3 @@
-#include <string.h>
-#include <blake3.h>
 #include <openssl/opensslv.h>
 #include <openssl/rand.h>
 #include <openssl/bio.h>
@@ -8,30 +6,6 @@
 ssc_static_assert(OPENSSL_VERSION_MAJOR == 3, check_openssl_version_3_x);
 
 #define HEXDUMP_FP stderr
-#define BLAKE3_DERIVE_KEY_CONTEXT "shadowsocks 2022 session subkey"
-
-typedef struct cipher_info {
-    char *method;
-    char *algo;
-    unsigned char keysize;
-} cipher_info_t;
-
-static const cipher_info_t supported_ciphers[] = {
-    { "2022-blake3-aes-128-gcm", "AES-128-GCM", 16 },
-    { "2022-blake3-aes-256-gcm", "AES-256-GCM", 32 },
-};
-
-static const long n_supported_ciphers = sizeof(supported_ciphers) / sizeof(*supported_ciphers);
-
-static inline void iv_inc(unsigned char *iv) {
-    uint32_t *high;
-    uint64_t *low  = (uint64_t*) iv;
-    *low += 1;
-    if (*low == 0) {
-        high = (uint32_t*) &iv[(sizeof(*low))];
-        *high += 1;
-    }
-}
 
 ssc_crypto_cipher *ssc_crypto_cipher_fetch(const char *method, unsigned char *keysize_out) {
     // supported ciphers length
@@ -56,24 +30,6 @@ int ssc_crypto_init(ssc_crypto_t *self, ssc_crypto_cipher *cipher, unsigned char
     self->keysize = keysize;
     self->cipher = cipher;
     return 1;
-}
-
-static inline int set_subkey(void *out, const void *key, const void *salt, size_t keysize) {
-    blake3_hasher hasher;
-    memset(&hasher, 0, sizeof(hasher));
-    blake3_hasher_init_derive_key(&hasher, BLAKE3_DERIVE_KEY_CONTEXT);
-    blake3_hasher_update(&hasher, key, keysize);
-    blake3_hasher_update(&hasher, salt, keysize);
-    blake3_hasher_finalize(&hasher, out, BLAKE3_OUT_LEN);
-    return 1;
-}
-
-int ssc_crypto_enc_subkey_set(ssc_crypto_t *self, const void *key, const void *salt) {
-    return set_subkey(self->enc_subkey, key, salt, self->keysize);
-}
-
-int ssc_crypto_dec_subkey_set(ssc_crypto_t *self, const void *key, const void *salt) {
-    return set_subkey(self->dec_subkey, key, salt, self->keysize);
 }
 
 int ssc_crypto_encrypt(ssc_crypto_t *self,

@@ -12,6 +12,6 @@
 #include "base/arena.c"
 #include "base/mempool.c"
 #include "base64.c"
-#include "crypto/openssl_crypto.c"
+#include "crypto/crypto.c"
 #include "ssc.c"
 #include "local.c"
