@@ -361,10 +361,6 @@ static void remote_read_cb(uv_stream_t *remote, ssize_t nread, const uv_buf_t *r
         break;
 
         case REMOTE_STAGE_PROXY: {
-            // if (nread <= 18) {
-            //     LOGE("length chunk is not followed by a payload chunk (nread = %ld)\n", nread);
-            //     goto ret;
-            // }
             char *base = rdbuf->base;
             assert(nread >= s->mustread);
             if (s->mustread != 0) {
@@ -417,7 +413,6 @@ static void remote_read_cb(uv_stream_t *remote, ssize_t nread, const uv_buf_t *r
                     s->tmppos = nread;
                     goto ret;
                 }
-                // assert(nread >= (payload_length + TAG_SIZE));
 
                 wrreq = ssc_mempool_get(&wrreq_pool);
                 wrreq->buf = (uv_buf_t){
