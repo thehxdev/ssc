@@ -29,6 +29,7 @@ typedef struct ssc_session {
     int client_stage, remote_stage;
     unsigned char salt[AES_MAX_KEY_SIZE];
     char socksreply[10];
+    char addr_str[INET_ADDRSTRLEN + 7];
     long mustread;
     // temporary buffer
     long tmppos;
@@ -61,23 +62,23 @@ static void buf_alloc_cb(uv_handle_t *handle, size_t suggested_size, uv_buf_t *b
 }
 
 static void session_close_cb(uv_handle_t *handle) {
-    LOGI("closed session!\n");
     ssc_session_t *s = handle->data;
     ssc_crypto_deinit(&s->crypto);
+    LOGI("%s session closed\n", s->addr_str);
     ssc_mempool_put(&session_pool, s);
 }
 
 static void wrreq_put_cb(uv_write_t *req, int status) {
-    // unused(status);
-    if (status < 0)
-        LOGE("write error!\n");
+    unused(status);
+    // if (status < 0)
+    //     LOGE("%s write error!\n");
     ssc_mempool_put(&wrreq_pool, req);
 }
 
 static void wrreq_put_buf_cb(uv_write_t *req, int status) {
-    // unused(status);
-    if (status < 0)
-        LOGE("write error!\n");
+    unused(status);
+    // if (status < 0)
+    //     LOGE("write error!\n");
     ssc_write_req_t *wrreq = (ssc_write_req_t*) req;
     ssc_mempool_put(&bufpool, wrreq->buf.base);
     ssc_mempool_put(&wrreq_pool, wrreq);
@@ -107,7 +108,7 @@ static void client_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *r
     if (nread < 0 || nread == UV_EOF) {
         // TODO: read error must be handled seperately on each stage.
         if (nread != UV_EOF)
-            LOGE("client_read_cb: %s\n", uv_strerror(nread));
+            LOGE("%s read callback: %s\n", s->addr_str, uv_strerror(nread));
         goto failed;
     }
 
@@ -245,7 +246,7 @@ static void client_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *r
 
             assert(wrreq->buf.len == (keysize + sizeof(fheader) + TAG_SIZE + vheader_length + TAG_SIZE));
             uv_write((uv_write_t*) wrreq, (uv_stream_t*) &s->remote, &wrreq->buf, 1, wrreq_put_buf_cb);
-            LOGI("wrote %ld bytes of client handshake to remote\n", wrreq->buf.len);
+            LOGI("%s --> (remote): wrote %ld bytes of ss handshake\n", s->addr_str, wrreq->buf.len);
 
             arena_pop(gmem, vheader_length);
 
@@ -286,7 +287,7 @@ static void client_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *r
 
             uv_write((uv_write_t*) wrreq, (uv_stream_t*) &s->remote,
                      &wrreq->buf, 1, wrreq_put_buf_cb);
-            LOGI("wrote %ld bytes from client to remote\n", wrreq->buf.len);
+            LOGI("%s --> (remote): wrote %ld bytes of data\n", s->addr_str, wrreq->buf.len);
         }
         break;
     };
@@ -304,7 +305,7 @@ static void remote_read_cb(uv_stream_t *remote, ssize_t nread, const uv_buf_t *r
     ssc_session_t *s = remote->data;
     if (nread < 0 || nread == UV_EOF) {
         if (nread != UV_EOF)
-            LOGE("remote_read_cb: %s\n", uv_strerror(nread));
+            LOGE("(remote): read callback: %s\n", uv_strerror(nread));
         goto failed;
     }
 
@@ -353,7 +354,7 @@ static void remote_read_cb(uv_stream_t *remote, ssize_t nread, const uv_buf_t *r
 
             uv_write((uv_write_t*) wrreq, (uv_stream_t*) &s->client,
                      &wrreq->buf, 1, wrreq_put_buf_cb);
-            LOGI("wrote %ld bytes of first payload to client\n", wrreq->buf.len);
+            LOGI("%s <-- (remote): wrote %ld bytes of first payload\n", s->addr_str, wrreq->buf.len);
 
             s->remote_stage++;
         }
@@ -401,7 +402,7 @@ static void remote_read_cb(uv_stream_t *remote, ssize_t nread, const uv_buf_t *r
                                         &base[sizeof(uint16_t)], TAG_SIZE,
                                         NULL, 0);
                 if (!ok) {
-                    LOGE("decrypt length chunk failed (nread = %ld)\n", nread);
+                    LOGE("%s: decrypt length chunk failed (nread = %ld)\n", s->addr_str, nread);
                     goto failed;
                 }
                 assert(ok);
@@ -434,7 +435,7 @@ static void remote_read_cb(uv_stream_t *remote, ssize_t nread, const uv_buf_t *r
 
                 uv_write((uv_write_t*) wrreq, (uv_stream_t*) &s->client,
                          &wrreq->buf, 1, wrreq_put_buf_cb);
-                LOGI("wrote %ld bytes from remote to client\n", wrreq->buf.len);
+                LOGI("%s <-- (remote): wrote %ld bytes of data\n", s->addr_str, wrreq->buf.len);
                 nread -= payload_length + TAG_SIZE;
                 base += payload_length + TAG_SIZE;
             }
@@ -512,7 +513,8 @@ static void server_accept_cb(uv_stream_t *socks_server, int status) {
     uv_tcp_getpeername(&s->client, (struct sockaddr*) &caddr, &caddr_len);
 
     uv_inet_ntop(caddr.sin_family, &caddr.sin_addr, addrstr, (socklen_t)caddr_len);
-    LOGI("new connection from %s:%d\n", addrstr, ntohs(caddr.sin_port));
+    snprintf(s->addr_str, sizeof(s->addr_str)-1, "%s:%d", addrstr, ntohs(caddr.sin_port));
+    LOGI("new connection from %s\n", s->addr_str);
 
     uv_read_start((uv_stream_t*) &s->client, buf_alloc_cb, client_read_cb);
 }
