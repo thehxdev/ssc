@@ -14,5 +14,5 @@ void os_dlclose(dl_handle_t handle) {
 
 char *os_dlerror(void) {
     static const char *dlerr = "os_dlerror: windows does not say what went wrong!";
-    return err;
+    return dlerr;
 }
