@@ -98,7 +98,7 @@ int base64_decode(uint8_t *out, size_t out_size, const char *in_str)
     // no sign extension
     const uint8_t *in = (const uint8_t*)in_str;
     unsigned bits = 0xff;
-    unsigned v;
+    unsigned v = 0;
 
     if (!out)
         goto validity_check;

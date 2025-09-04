@@ -7,6 +7,4 @@
 
 typedef HINSTANCE dl_handle_t;
 
-dl_handle_t os_dlopen(const char *path);
-
 #endif // _SSC_OS_CORE_WINDOWS_H_
