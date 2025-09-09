@@ -70,15 +70,11 @@ static void session_close_cb(uv_handle_t *handle) {
 
 static void wrreq_put_cb(uv_write_t *req, int status) {
     unused(status);
-    // if (status < 0)
-    //     LOGE("%s write error!\n");
     ssc_mempool_put(&wrreq_pool, req);
 }
 
 static void wrreq_put_buf_cb(uv_write_t *req, int status) {
     unused(status);
-    // if (status < 0)
-    //     LOGE("write error!\n");
     ssc_write_req_t *wrreq = (ssc_write_req_t*) req;
     ssc_mempool_put(&bufpool, wrreq->buf.base);
     ssc_mempool_put(&wrreq_pool, wrreq);

@@ -17,7 +17,7 @@
     #define trap_assert(cond) \
         do { \
             if (!(cond)) { \
-                fprintf(stderr, "trap_assert(" #cond ")"); \
+                fprintf(stderr, "%s(%d): trap_assert(" #cond ")", __FILE__, __LINE__); \
                 TRAP; \
             } \
         } while (0)
