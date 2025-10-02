@@ -8,6 +8,7 @@ vcpkg/
 *.obj
 *.o
 *.exp
+*.pdb
 *.lib
 compile_commands.json
 compile_flags.txt
