@@ -7,44 +7,62 @@ as described in [SIP022](https://shadowsocks.org/doc/sip022.html).
 > error/event handling. In order to use Shadowsocks, checkout
 > [shadowsocks-rust](https://github.com/shadowsocks/shadowsocks-rust).
 
+
 ## Unique features
-- No malloc/free (at least for now). All memory is managed by a single Arena
-and some Pool allocators. EVERY allocation, IS reusable thanks to pool allocators.
-This keeps memory usage low and avoids memory fragmentation.
+- 100% written by human. No AI shit. (It's a feature these days)
 
-- The config is a single `.c` file that compiles to a `.so` (on unix) or `.dll`
-(on windows) and loaded on runtime.
+- No malloc/free. All memory is managed by a single Arena and some Pool
+allocators. EVERY allocation, IS reusable thanks to pool allocators. This keeps
+memory usage low and avoids memory fragmentation and null pointer crashes.
 
-- Unity Build! Build the project with JUST the C compiler and a single command.
+- The config is a single `.c` file that compiles to a `.so` (on Unix) or `.dll`
+(on Windows) and loaded on runtime.
+
+- Unity Build!
+
 
 ## Build
-SSC dependes on these projects:
+SSC depends on these projects:
 - LibUV: As event loop implementation
 - OpenSSL: For encryption/decryption
 - BLAKE3: For sub-key derivation with random salt
 
-To build all dependencies, run [`build-deps.bash`](build-deps.bash) script in
-project's root directory. This script will install dependencies to `_deps`
-subdirectory in the project's root directory (NOT globally).
+### Dependencies
+Build dependencies before building `ssc`. All dependencies will be installed on
+the project root directory and NOT system-wide.
 
-Edit the [`config.c`](config.c) file. Then build the config and project with
-[`build.bash`](build.bash) script.
+#### Unix-like
+On Unix-like systems use [`build-deps.bash`](build-deps.bash) to install all
+dependencies locally on project root directory.
 
-### Build notes
-This project uses [Unity Build](https://en.wikipedia.org/wiki/Unity_build). In
-order to build SSC, you just need a C compiler and nothing else! You can build
-`ssc-local` executable with this simple command even without the build script:
-```bash
-cc -std=gnu99 \
-    -I_deps/include -Isrc -L_deps/lib \
-    -O2 -DNDEBUG -o 'ssc-local' \
-    'src/local_build.c' \
-    -l:libuv.a -l:libcrypto.a -l:libblake3.a
+#### x64 Windows
+Use `vcpkg` to install dependencies on windows. Run these commands on project
+root directory:
+```powershell
+git clone --depth=1 "https://github.com/microsoft/vcpkg.git"
+cd .\vcpkg\
+.\bootstrap-vcpkg.bat
+.\vcpkg install openssl libuv blake3 --triplet x64-windows
+cd ..\
 ```
+
+### SSC
+Edit the [`config.c`](config.c) file. Then build the config and project using
+the build script. On Unix-like systems use [`build.bash`](build.bash) and on
+x64 Windows use [`build.bat`](build.bat) script.
+
+To rebuild the project just re-run the build script.
+
 
 ## Run
-Run the shadowsocks client implementation (`ssc-local`):
+Run the Shadowsocks client implementation (`ssc-local`):
 ```bash
+# Unix-like
 ./_build/ssc-local ./_build/config.so
+
+# Windows
+.\_build\ssc-local.exe .\_build\config.dll
 ```
-If you change the configuration, you must compile `config.c` to `config.so` file again.
+
+> [!NOTE]
+> Once you changed `config.c` file, run build script again.

@@ -1,7 +1,9 @@
 #define __dlsym_ex(handle, name) \
     tmp = os_dlsym((handle), (name)); \
-    if (!tmp) \
-        goto ret_close_handle;
+    if (!tmp) { \
+        fprintf(stderr, "os_dlsym failed to fetch %s\n", name); \
+        goto ret_close_handle; \
+    }
 
 int ssc_config_readall(arena_t *arena, const char *dlpath, struct ssc_config *config) {
     int ok = 0, i;

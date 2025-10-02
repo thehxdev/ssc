@@ -8,7 +8,6 @@
 #include <assert.h>
 #include <stdint.h>
 
-
 dl_handle_t os_dlopen(const char *path);
 
 void *os_dlsym(dl_handle_t handle, const char *symbol);

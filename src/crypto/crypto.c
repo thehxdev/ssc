@@ -48,4 +48,8 @@ int ssc_crypto_dec_subkey_set(ssc_crypto_t *self, const void *key, const void *s
     return ssc_crypto_set_subkey(self->dec_subkey, key, salt, self->keysize);
 }
 
-#include "crypto/openssl_crypto.c"
+#ifdef SSC_CRYPTO_OPENSSL
+    #include "openssl_crypto.c"
+#else
+    #error "no crypto provider specified"
+#endif

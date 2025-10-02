@@ -77,7 +77,11 @@ static const uint8_t map2[256] =
     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 };
 
+#ifdef _MSC_VER
+union __base64_unaligned_32 { uint32_t l; };
+#else
 union __base64_unaligned_32 { uint32_t l; } __attribute__((packed, may_alias));
+#endif
 
 #define BASE64_DEC_STEP(i) do { \
     bits = map2[in[i]]; \
@@ -86,8 +90,9 @@ union __base64_unaligned_32 { uint32_t l; } __attribute__((packed, may_alias));
     v = i ? (v << 6) + bits : bits; \
 } while(0)
 
-#define __base64_bswap16(x) (((x) << 8 & 0xff00)  | ((x) >> 8 & 0x00ff))
-#define __base64_bswap32(x) (__base64_bswap16(x) << 16 | __base64_bswap16((x) >> 16))
+#define __base64_bswap16(x) (ssc_bswap16(x))
+#define __base64_bswap32(x) (ssc_bswap32(x))
+#define __base64_bswap64(x) (ssc_bswap64(x))
 
 #define __base64_wn32(p, v) ((((union __base64_unaligned_32*) (p))->l) = (v))
 
@@ -147,7 +152,7 @@ out2:
         *dst++ = v >> 4;
 out1:
 out0:
-    return (bits & 1) ? (-1) : (out ? (dst-out) : 0);
+    return (int)((bits & 1) ? (-1) : (out ? (dst-out) : 0));
 }
 
 /*****************************************************************************
@@ -161,7 +166,7 @@ char *base64_encode(char *out, size_t out_size, const uint8_t *in, size_t in_siz
     char *ret, *dst;
     unsigned i_bits = 0;
     int i_shift = 0;
-    int bytes_remaining = in_size;
+    int bytes_remaining = (int)in_size;
 
     if (in_size >= UINT_MAX / 4 ||
         out_size < BASE64_SIZE(in_size))

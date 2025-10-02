@@ -35,6 +35,7 @@ log_run $CC -fPIC -shared -o "$BUILD_PATH/config.so" "$SELF_PATH/config.c"
 log_run $CC \
     "${CFLAGS[@]}" "${LDFLAGS[@]}" \
     -DSSC_OS_UNIX=1 \
+    -DSSC_CRYPTO_OPENSSL=1 \
     -I"$DEPS_PATH/include" \
     -I"$SELF_PATH/src" \
     -L"$DEPS_PATH/lib" \

@@ -1,7 +1,7 @@
 // Windows specific implementations
 
 dl_handle_t os_dlopen(const char *path) {
-    return LoadLibrary(dlpath);
+    return LoadLibrary(path);
 }
 
 void *os_dlsym(dl_handle_t handle, const char *symbol) {
@@ -14,5 +14,5 @@ void os_dlclose(dl_handle_t handle) {
 
 char *os_dlerror(void) {
     static const char *dlerr = "os_dlerror: windows does not say what went wrong!";
-    return dlerr;
+    return (char*)dlerr;
 }

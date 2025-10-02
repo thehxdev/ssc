@@ -1,6 +1,10 @@
-#include <uv.h>
-
 #define BUFFER_SIZE 0x10021
+
+#ifdef _WIN32
+    #define DEFAULT_CONFIG_PATH ".\\config.dll"
+#else
+    #define DEFAULT_CONFIG_PATH "./config.so"
+#endif
 
 enum {
     CLIENT_STAGE_SOCKS5_METHOD_SELECTION,
@@ -37,7 +41,7 @@ typedef struct ssc_session {
 } ssc_session_t;
 
 // global memory - no malloc/free hell!
-// just arena and pool allocators
+// just arena and pool allocators.
 static arena_t *gmem;
 static ssc_mempool_t bufpool;
 static ssc_mempool_t session_pool;
@@ -56,7 +60,7 @@ static void dummy_func(void) {}
 
 // allocate a buffer for libuv's "read" callbacks
 static void buf_alloc_cb(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf) {
-    unused(handle); unused(suggested_size);
+    SSC_UNUSED(handle); SSC_UNUSED(suggested_size);
     buf->base = ssc_mempool_get(&bufpool);
     buf->len  = BUFFER_SIZE;
 }
@@ -69,25 +73,25 @@ static void session_close_cb(uv_handle_t *handle) {
 }
 
 static void wrreq_put_cb(uv_write_t *req, int status) {
-    unused(status);
+    SSC_UNUSED(status);
     ssc_mempool_put(&wrreq_pool, req);
 }
 
 static void wrreq_put_buf_cb(uv_write_t *req, int status) {
-    unused(status);
+    SSC_UNUSED(status);
     ssc_write_req_t *wrreq = (ssc_write_req_t*) req;
     ssc_mempool_put(&bufpool, wrreq->buf.base);
     ssc_mempool_put(&wrreq_pool, wrreq);
 }
 
 static void socks_handshake_failed_cb(uv_write_t *req, int status) {
-    unused(status);
+    SSC_UNUSED(status);
     uv_close((uv_handle_t*) req->handle, session_close_cb);
     ssc_mempool_put(&wrreq_pool, req);
 }
 
 static void socks_reply_failed_cb(uv_write_t *req, int status) {
-    unused(status);
+    SSC_UNUSED(status);
     uv_close((uv_handle_t*) req->handle, session_close_cb);
     ssc_mempool_put(&wrreq_pool, req);
 }
@@ -186,14 +190,14 @@ static void client_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *r
 
             // big endian timestamp
             // write timestamp to fixed-length header
-            *((uint64_t*)&fheader[ptr]) = htobe64(time(NULL));
+            *((uint64_t*)&fheader[ptr]) = ssc_bswap64(time(NULL));
             ptr += sizeof(uint64_t);
 
             // set length field (variable-length header length) in fixed-length header
             long padding_length = (rand() % 900) + 1;
             long vheader_length = s->tmppos + sizeof(uint16_t) + padding_length + nread;
             assert(vheader_length <= UINT16_MAX);
-            *((uint16_t*)&fheader[ptr]) = htobe16((uint16_t) vheader_length);
+            *((uint16_t*)&fheader[ptr]) = ssc_bswap16((uint16_t)vheader_length);
 
             // encrypt and write fixed-length header and it's tag to request buffer
             ok = ssc_crypto_encrypt(&s->crypto,
@@ -221,7 +225,7 @@ static void client_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *r
             s->tmppos = 0;
 
             // set padding length
-            *((uint16_t*)&vheader[ptr]) = htobe16(padding_length);
+            *((uint16_t*)&vheader[ptr]) = ssc_bswap16(padding_length);
             ptr += sizeof(uint16_t) + padding_length;
 
             // write initial payload
@@ -260,7 +264,7 @@ static void client_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *r
                 .len  = 0
             };
 
-            uint16_t nread_be16 = htobe16(nread);
+            uint16_t nread_be16 = ssc_bswap16(nread);
             ok = ssc_crypto_encrypt(&s->crypto,
                                     wrreq->buf.base, &encrypted_size,
                                     &wrreq->buf.base[sizeof(uint16_t)], TAG_SIZE,
@@ -511,7 +515,7 @@ static void server_accept_cb(uv_stream_t *socks_server, int status) {
 }
 
 static void sigint_cb(uv_signal_t *handle, int signum) {
-    unused(signum); unused(handle);
+    SSC_UNUSED(signum); SSC_UNUSED(handle);
     uv_stop(loop);
 }
 
@@ -520,14 +524,14 @@ int main(int argc, char *argv[]) {
     char *config_path;
 
     if (argc != 2)
-        config_path = "./config.so";
+        config_path = DEFAULT_CONFIG_PATH;
     else
         config_path = argv[1];
 
     arena_config_t aconf = ARENA_DEFAULT_CONFIG;
     aconf.flags   = ARENA_FIXED;
     aconf.reserve = ARENA_MB(128ULL);
-    aconf.commit  = ARENA_MB(16ULL);
+    aconf.commit  = ARENA_MB(32ULL);
     if ( !(gmem = arena_new(&aconf)))
         goto ret;
 
@@ -536,8 +540,10 @@ int main(int argc, char *argv[]) {
     ssc_mempool_init(&wrreq_pool, gmem, sizeof(ssc_write_req_t));
 
     struct ssc_config config;
-    if ( (err = !ssc_config_readall(gmem, config_path, &config)))
+    if ( (err = !ssc_config_readall(gmem, config_path, &config))) {
+        LOGE("failed to read config file\n");
         goto ret_free_gmem;
+    }
 
     cipher = ssc_crypto_cipher_fetch(config.sf[CONFIG_METHOD], &keysize);
     base64_decode(key, keysize, config.sf[CONFIG_PASSWORD]);

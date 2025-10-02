@@ -2,8 +2,13 @@ _deps/
 _build/
 .cache/
 keys/
+vcpkg/
 *.pem
 *.so
+*.obj
+*.o
+*.exp
+*.lib
 compile_commands.json
 compile_flags.txt
 tags

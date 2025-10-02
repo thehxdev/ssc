@@ -1,7 +1,10 @@
 #ifndef _SSC_BASE_BASE_H_
 #define _SSC_BASE_BASE_H_
 
-#define unused(v) ((void)(v))
+#include "memory/arena.h"
+#include "memory/mempool.h"
+
+#define SSC_UNUSED(v) ((void)(v))
 
 #if defined(__GNUC__) || defined(__clang__)
     #define TRAP __builtin_trap()
@@ -11,7 +14,7 @@
     #define TRAP (*(volatile char*)0)
 #endif
 
-#ifdef NDEBUG
+#if defined(NDEBUG) || (defined(BUILD_DEBUG) && BUILD_DEBUG == 1)
     #define trap_assert(cond)
 #else
     #define trap_assert(cond) \
@@ -33,5 +36,9 @@
 #define ssc_concat(A,B) ssc_concat_(A,B)
 #define ssc_static_assert(condition, id) \
     extern char ssc_concat(id, __LINE__)[ ((condition)) ? 1 : -1 ]
+
+#define ssc_bswap16(x) (((x) << 8 & 0xff00)  | ((x) >> 8 & 0x00ff))
+#define ssc_bswap32(x) (ssc_bswap16(x) << 16 | ssc_bswap16((x) >> 16))
+#define ssc_bswap64(x) (ssc_bswap32(x) << 32 | ssc_bswap32((x) >> 32))
 
 #endif // _SSC_BASE_BASE_H_

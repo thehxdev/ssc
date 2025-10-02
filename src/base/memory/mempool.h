@@ -18,6 +18,4 @@ void *ssc_mempool_get(ssc_mempool_t *self);
 
 void ssc_mempool_put(ssc_mempool_t *self, void *v);
 
-void ssc_mempool_free(ssc_mempool_t *self);
-
 #endif // _SSC_MEMORY_POOL_H_
