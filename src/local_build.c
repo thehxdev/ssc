@@ -21,6 +21,7 @@
 #include "log.h"
 #include "socks5.h"
 #include "config.h"
+#include "ss/ss.h"
 
 #include "os/os.c"
 #include "base/base.c"

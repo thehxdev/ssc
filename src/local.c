@@ -29,12 +29,16 @@ typedef struct ssc_write_req {
 typedef struct ssc_session {
     uv_tcp_t client, remote;
     uv_connect_t conreq;
-    ssc_crypto_t crypto;
     int client_stage, remote_stage;
+
+    ssc_crypto_t crypto;
     unsigned char salt[AES_MAX_KEY_SIZE];
+
     char socksreply[10];
     char addr_str[INET_ADDRSTRLEN + 7];
+
     long mustread;
+
     // temporary buffer
     long tmppos;
     char tmpbuf[BUFFER_SIZE];
@@ -190,22 +194,20 @@ static void client_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *r
             //////
             // begin fixed-length header
             //////
-            unsigned char fixed_header[11];
+            ssc_fixed_header_t fixed_header;
 
             // set fixed-length header's type.
             // request streams has type 0.
-            fixed_header[ptr++] = 0;
+            fixed_header.type = 0;
 
             // big endian timestamp
-            // write timestamp to fixed-length header
-            *((uint64_t*)&fixed_header[ptr]) = ssc_bswap64(time(NULL));
-            ptr += sizeof(uint64_t);
+            fixed_header.timestamp = ssc_bswap64(time(NULL));
 
             // set length field (variable-length header length) in fixed-length header
-            long padding_length = (rand() % 900) + 1;
-            long vheader_length = s->tmppos + sizeof(uint16_t) + padding_length + nread;
+            uint16_t padding_length = (rand() % 900) + 1;
+            int vheader_length = s->tmppos + sizeof(uint16_t) + padding_length + nread;
             assert(vheader_length <= UINT16_MAX);
-            *((uint16_t*)&fixed_header[ptr]) = ssc_bswap16((uint16_t)vheader_length);
+            fixed_header.length = ssc_bswap16((uint16_t)vheader_length);
 
             // encrypt and write fixed-length header and it's tag to request buffer
             ok = ssc_crypto_encrypt(&s->crypto,
@@ -225,7 +227,7 @@ static void client_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *r
             // begin variable-length header
             //////
             ptr = 0;
-            unsigned char *vheader = arena_alloc(gmem, vheader_length);
+            uint8_t *vheader = arena_alloc(gmem, vheader_length);
 
             // set destination address type, address and port in variable-length header
             memcpy(&vheader[ptr], s->tmpbuf, s->tmppos);
@@ -300,15 +302,13 @@ static void client_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *r
         break;
     };
 
-    goto ret;
+ret:
+    ssc_mempool_put(&bufpool, rdbuf->base);
+    return;
 
 failed:
     uv_close((uv_handle_t*) client, session_close_cb);
     uv_close((uv_handle_t*) &s->remote, (uv_close_cb) dummy_func);
-    return;
-
-ret:
-    ssc_mempool_put(&bufpool, rdbuf->base);
 }
 
 static void remote_read_cb(uv_stream_t *remote, ssize_t nread, const uv_buf_t *rdbuf) {
