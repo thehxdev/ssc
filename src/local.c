@@ -18,8 +18,8 @@ enum {
     REMOTE_STAGE_PROXY
 };
 
-#undef assert
-#define assert trap_assert
+// #undef assert
+// #define assert trap_assert
 
 typedef struct ssc_write_req {
     uv_write_t req;
@@ -105,10 +105,11 @@ static void client_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *r
     ssc_session_t *s = client->data;
     long ok, encrypted_size, ptr = 0;
 
-    if (nread < 0 || nread == UV_EOF) {
+    if (nread == UV_EOF) {
+        goto failed;
+    } else if (nread < 0) {
         // TODO: read error must be handled seperately on each stage.
-        if (nread != UV_EOF)
-            LOGE("%s read callback: %s\n", s->addr_str, uv_strerror(nread));
+        LOGE("%s read callback: %s\n", s->addr_str, uv_strerror(nread));
         goto failed;
     }
 
@@ -159,6 +160,12 @@ static void client_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *r
                 goto ret;
             }
 
+            // Save destination address requested by the client to session's temp
+            // buffer and delegate DNS resolution to the Shadowsocks server.
+            // This information will be used in the handshake with Shadowsocks server
+            // and since the address format in Shadowsocks client handshake is same as
+            // the socks5 one, we can copy the temp buffer's content directly to handshake
+            // buffer.
             memcpy(s->tmpbuf, &rdbuf->base[3], nread - 3);
             s->tmppos = nread - 3;
 
@@ -183,31 +190,32 @@ static void client_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *r
             //////
             // begin fixed-length header
             //////
-            unsigned char fheader[11];
+            unsigned char fixed_header[11];
 
-            // set fixed-length header's type
-            fheader[ptr++] = 0;
+            // set fixed-length header's type.
+            // request streams has type 0.
+            fixed_header[ptr++] = 0;
 
             // big endian timestamp
             // write timestamp to fixed-length header
-            *((uint64_t*)&fheader[ptr]) = ssc_bswap64(time(NULL));
+            *((uint64_t*)&fixed_header[ptr]) = ssc_bswap64(time(NULL));
             ptr += sizeof(uint64_t);
 
             // set length field (variable-length header length) in fixed-length header
             long padding_length = (rand() % 900) + 1;
             long vheader_length = s->tmppos + sizeof(uint16_t) + padding_length + nread;
             assert(vheader_length <= UINT16_MAX);
-            *((uint16_t*)&fheader[ptr]) = ssc_bswap16((uint16_t)vheader_length);
+            *((uint16_t*)&fixed_header[ptr]) = ssc_bswap16((uint16_t)vheader_length);
 
             // encrypt and write fixed-length header and it's tag to request buffer
             ok = ssc_crypto_encrypt(&s->crypto,
                                     &wrreq->buf.base[wrreq->buf.len], &encrypted_size,
-                                    &wrreq->buf.base[wrreq->buf.len + sizeof(fheader)], TAG_SIZE,
-                                    fheader, sizeof(fheader),
+                                    &wrreq->buf.base[wrreq->buf.len + sizeof(fixed_header)], TAG_SIZE,
+                                    fixed_header, sizeof(fixed_header),
                                     NULL, 0);
             assert(ok);
-            assert(encrypted_size == sizeof(fheader));
-            wrreq->buf.len += sizeof(fheader) + TAG_SIZE;
+            assert(encrypted_size == sizeof(fixed_header));
+            wrreq->buf.len += sizeof(fixed_header) + TAG_SIZE;
             //////
             // end fixed-length header
             //////
@@ -244,7 +252,7 @@ static void client_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *r
             // end variable-length header
             //////
 
-            assert(wrreq->buf.len == (keysize + sizeof(fheader) + TAG_SIZE + vheader_length + TAG_SIZE));
+            assert(wrreq->buf.len == (keysize + sizeof(fixed_header) + TAG_SIZE + vheader_length + TAG_SIZE));
             uv_write((uv_write_t*) wrreq, (uv_stream_t*) &s->remote, &wrreq->buf, 1, wrreq_put_buf_cb);
             LOGI("%s --> (remote): wrote %ld bytes of ss handshake\n", s->addr_str, wrreq->buf.len);
 
@@ -297,6 +305,8 @@ static void client_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *r
 failed:
     uv_close((uv_handle_t*) client, session_close_cb);
     uv_close((uv_handle_t*) &s->remote, (uv_close_cb) dummy_func);
+    return;
+
 ret:
     ssc_mempool_put(&bufpool, rdbuf->base);
 }

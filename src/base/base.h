@@ -37,7 +37,7 @@
 #define ssc_static_assert(condition, id) \
     extern char ssc_concat(id, __LINE__)[ ((condition)) ? 1 : -1 ]
 
-#define ssc_bswap16(x) (((x) << 8 & 0xff00)  | ((x) >> 8 & 0x00ff))
+#define ssc_bswap16(x) ((((x) << 8) & 0xff00)  | (((x) >> 8) & 0x00ff))
 #define ssc_bswap32(x) (ssc_bswap16(x) << 16 | ssc_bswap16((x) >> 16))
 #define ssc_bswap64(x) (ssc_bswap32(x) << 32 | ssc_bswap32((x) >> 32))
 
