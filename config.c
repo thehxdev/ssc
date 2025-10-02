@@ -3,7 +3,7 @@
 #ifdef _MSC_VER
     #define EXPORT __declspec(dllexport)
 #else
-    #define EXPORT export
+    #define EXPORT extern
 #endif
 
 // This is the config file for ssc Shadowsocks implementation. Users must
