@@ -5,3 +5,5 @@
 #endif
 
 #include "os/core/os_core.c"
+#include "os/memory/arena.c"
+#include "os/memory/mempool.c"

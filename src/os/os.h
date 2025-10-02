@@ -8,5 +8,7 @@
 #endif
 
 #include "os/core/os_core.h"
+#include "os/memory/arena.h"
+#include "os/memory/mempool.h"
 
 #endif // _SSC_OS_H_
