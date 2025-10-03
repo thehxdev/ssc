@@ -128,7 +128,8 @@ static void client_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *r
                 .base = s->socksreply,
                 .len = 2
             };
-            memcpy(wrreq->buf.base, (char[]){SOCKS5_Version, SOCKS5_NoAuth}, 2);
+            wrreq->buf.base[0] = SOCKS5_Version;
+            wrreq->buf.base[1] = SOCKS5_NoAuth;
             int nmethods = rdbuf->base[1];
             char *methods_last = &rdbuf->base[nread - 1];
             while (nmethods--) {
@@ -146,7 +147,11 @@ static void client_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *r
         break;
 
         case CLIENT_STAGE_SOCKS5_REQUEST_REPLY: {
-            memcpy(s->socksreply, (unsigned char[]){SOCKS5_Version, SOCKS5_Ok, SOCKS5_Reserved, SOCKS5_ATYPE_IPV4}, 4);
+            // This line is same as the memcpy function call below.
+            // Byte order is reversed because of little-endianness.
+            *((uint32_t*)s->socksreply) = 0x01000005;
+            // memcpy(s->socksreply, (unsigned char[]){SOCKS5_Version, SOCKS5_Ok, SOCKS5_Reserved, SOCKS5_ATYPE_IPV4}, 4);
+
             memcpy(&s->socksreply[4], &lisaddr.sin_addr.s_addr, 4);
             memcpy(&s->socksreply[8], &lisaddr.sin_port, 2);
 
@@ -170,7 +175,7 @@ static void client_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *r
             // and since the address format in Shadowsocks client handshake is same as
             // the socks5 one, we can copy the temp buffer's content directly to handshake
             // buffer.
-            memcpy(s->tmpbuf, &rdbuf->base[3], nread - 3);
+            ssc_memcpy_fast(s->tmpbuf, &rdbuf->base[3], nread - 3);
             s->tmppos = nread - 3;
 
             uv_tcp_connect(&s->conreq, &s->remote, (struct sockaddr*) &remaddr,
@@ -213,7 +218,7 @@ static void client_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *r
             ok = ssc_crypto_encrypt(&s->crypto,
                                     &wrreq->buf.base[wrreq->buf.len], &encrypted_size,
                                     &wrreq->buf.base[wrreq->buf.len + sizeof(fixed_header)], TAG_SIZE,
-                                    fixed_header, sizeof(fixed_header),
+                                    &fixed_header, sizeof(fixed_header),
                                     NULL, 0);
             assert(ok);
             assert(encrypted_size == sizeof(fixed_header));
@@ -230,7 +235,7 @@ static void client_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *r
             uint8_t *vheader = arena_alloc(gmem, vheader_length);
 
             // set destination address type, address and port in variable-length header
-            memcpy(&vheader[ptr], s->tmpbuf, s->tmppos);
+            ssc_memcpy_fast(&vheader[ptr], s->tmpbuf, s->tmppos);
             ptr += s->tmppos;
             s->tmppos = 0;
 
@@ -239,7 +244,7 @@ static void client_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *r
             ptr += sizeof(uint16_t) + padding_length;
 
             // write initial payload
-            memcpy(&vheader[ptr], rdbuf->base, nread);
+            ssc_memcpy_fast(&vheader[ptr], rdbuf->base, nread);
             assert((ptr + nread) == vheader_length);
 
             ok = ssc_crypto_encrypt(&s->crypto,
@@ -374,7 +379,7 @@ static void remote_read_cb(uv_stream_t *remote, ssize_t nread, const uv_buf_t *r
             char *base = rdbuf->base;
             assert(nread >= s->mustread);
             if (s->mustread != 0) {
-                memcpy(&s->tmpbuf[s->tmppos], base, s->mustread);
+                ssc_memcpy_fast(&s->tmpbuf[s->tmppos], base, s->mustread);
 
                 s->tmppos += s->mustread;
 
@@ -419,7 +424,7 @@ static void remote_read_cb(uv_stream_t *remote, ssize_t nread, const uv_buf_t *r
                 payload_length = ntohs(payload_length);
                 if (payload_length + TAG_SIZE > nread) {
                     s->mustread = (payload_length + TAG_SIZE) - nread;
-                    memcpy(s->tmpbuf, base, nread);
+                    ssc_memcpy_fast(s->tmpbuf, base, nread);
                     s->tmppos = nread;
                     goto ret;
                 }
