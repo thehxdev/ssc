@@ -10,8 +10,11 @@
 // compile this config file to a shared object file (.so on unix and .dll on
 // windows)
 //
-// build command:
+// Build command on Unix:
 // $ cc -fPIC -shared -o config.so config.c
+//
+// On Windows (MSVC):
+// $ cl /LD .\config.c /link /out:.\config.dll
 
 // socks5 listening address
 EXPORT const char listen_addr[] = "127.0.0.1";
