@@ -3,6 +3,7 @@ _build/
 .cache/
 keys/
 vcpkg/
+.vs/
 *.pem
 *.so
 *.obj
