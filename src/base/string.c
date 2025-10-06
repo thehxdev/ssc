@@ -1,13 +1,13 @@
 typedef unsigned long long __ssc_word_t;
 
-#define __SSC_WORD_BIT_SIZE         (sizeof(__ssc_word_t) * 8U)
-#define __SSC_SHIFT_SIZE_BY         ((__SSC_WORD_BIT_SIZE >> 5U) + 1U)
+#define __SSC_WORD_BIT_SIZE         (sizeof(__ssc_word_t) << 3U)
+#define __SSC_SHIFT_N_BY            ((__SSC_WORD_BIT_SIZE >> 5U) + 1U)
 #define __SSC_LAST_BYTES_ADDR_MASK  ((__SSC_WORD_BIT_SIZE >> 3U) - 1U)
 
-#define __ssc_aligned_copy_info(__buffer, __n)                                              \
-    __ssc_word_t *__buffer##_word = (__ssc_word_t*) __buffer;                               \
-    __ssc_word_t *__buffer##_word_end = __buffer##_word + ((__n) >> __SSC_SHIFT_SIZE_BY);   \
-    uint8_t *__buffer##_byte = (uint8_t*) __buffer##_word_end;                              \
+#define __ssc_aligned_copy_info(__buffer, __n)                                          \
+    __ssc_word_t *__buffer##_word = (__ssc_word_t*) __buffer;                           \
+    __ssc_word_t *__buffer##_word_end = __buffer##_word + ((__n) >> __SSC_SHIFT_N_BY);  \
+    uint8_t *__buffer##_byte = (uint8_t*) __buffer##_word_end;                          \
     uint8_t *__buffer##_byte_end = __buffer##_byte + ((__n) & __SSC_LAST_BYTES_ADDR_MASK);
 
 

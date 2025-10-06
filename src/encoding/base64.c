@@ -77,11 +77,7 @@ static const uint8_t map2[256] =
     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 };
 
-#ifdef _MSC_VER
-union __base64_unaligned_32 { uint32_t l; };
-#else
-union __base64_unaligned_32 { uint32_t l; } __attribute__((packed, may_alias));
-#endif
+SSC_PACKED(union __base64_unaligned_32 { uint32_t l; });
 
 #define BASE64_DEC_STEP(i) do { \
     bits = map2[in[i]]; \

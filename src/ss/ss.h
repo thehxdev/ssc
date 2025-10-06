@@ -1,7 +1,7 @@
 #ifndef _SSC_SS_SS_H_
 #define _SSC_SS_SS_H_
 
-PACKED_STRUCT(struct ssc_fixed_header {
+SSC_PACKED(struct ssc_fixed_header {
     uint8_t type;
     uint64_t timestamp;
     uint16_t length;

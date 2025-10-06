@@ -235,7 +235,7 @@ static void client_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *r
             uint8_t *vheader = arena_alloc(gmem, vheader_length);
 
             // set destination address type, address and port in variable-length header
-            ssc_memcpy_fast(&vheader[ptr], s->tmpbuf, s->tmppos);
+            ssc_memcpy_fast(vheader, s->tmpbuf, s->tmppos);
             ptr += s->tmppos;
             s->tmppos = 0;
 

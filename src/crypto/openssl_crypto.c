@@ -3,7 +3,9 @@
 #include <openssl/bio.h>
 #include <openssl/evp.h>
 
-ssc_static_assert(OPENSSL_VERSION_MAJOR == 3, check_openssl_version_3_x);
+#if (OPENSSL_VERSION_MAJOR != 3) || (OPENSSL_VERSION_MINOR != 5)
+    #error "openssl version 3.5.x is expected"
+#endif
 
 #define HEXDUMP_FP stderr
 
