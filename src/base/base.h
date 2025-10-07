@@ -3,6 +3,16 @@
 
 #define SSC_UNUSED(v) ((void)(v))
 
+
+// Branch prediction hints
+#if defined(__clang__) || defined(__GNUC__)
+    #define SSC_EXPECT(expr, val) __builtin_expect((expr), (val))
+#else
+    #define SSC_EXPECT(expr, val) (expr)
+#endif
+#define SSC_LIKELY(expr)    SSC_EXPECT(expr, 1)
+#define SSC_UNLIKELY(expr)  SSC_EXPECT(expr, 0)
+
 #if defined(__GNUC__) || defined(__clang__)
     #define SSC_TRAP __builtin_trap()
     #define SSC_PACKED(__decl__) __decl__ __attribute__((packed))

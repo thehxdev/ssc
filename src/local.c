@@ -107,7 +107,7 @@ static void remote_connect_cb(uv_connect_t *req, int status);
 static void client_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *rdbuf) {
     ssc_write_req_t *wrreq;
     ssc_session_t *s = client->data;
-    long ok, encrypted_size, ptr = 0;
+    int ok, encrypted_size, ptr = 0;
 
     if (nread == UV_EOF) {
         goto failed;
@@ -131,7 +131,7 @@ static void client_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *r
             wrreq->buf.base[0] = SOCKS5_Version;
             wrreq->buf.base[1] = SOCKS5_NoAuth;
             int nmethods = rdbuf->base[1];
-            char *methods_last = &rdbuf->base[nread - 1];
+            uint8_t *methods_last = &rdbuf->base[nread - 1];
             while (nmethods--) {
                 if (methods_last[nmethods] == SOCKS5_NoAuth)
                     break;
@@ -206,12 +206,19 @@ static void client_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *r
             fixed_header.type = 0;
 
             // big endian timestamp
-            fixed_header.timestamp = ssc_bswap64(time(NULL));
+            fixed_header.timestamp = ssc_bswap64((uint64_t)time(NULL));
 
             // set length field (variable-length header length) in fixed-length header
+            bool with_initial_payload = true;
             uint16_t padding_length = (rand() % 900) + 1;
             int vheader_length = s->tmppos + sizeof(uint16_t) + padding_length + nread;
-            assert(vheader_length <= UINT16_MAX);
+
+            // This is a rare case
+            if (SSC_UNLIKELY(vheader_length > UINT16_MAX)) {
+                with_initial_payload = false;
+                vheader_length -= nread;
+            }
+
             fixed_header.length = ssc_bswap16((uint16_t)vheader_length);
 
             // encrypt and write fixed-length header and it's tag to request buffer
@@ -243,9 +250,17 @@ static void client_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *r
             *((uint16_t*)&vheader[ptr]) = ssc_bswap16(padding_length);
             ptr += sizeof(uint16_t) + padding_length;
 
-            // write initial payload
-            ssc_memcpy_fast(&vheader[ptr], rdbuf->base, nread);
-            assert((ptr + nread) == vheader_length);
+            if (SSC_LIKELY(with_initial_payload)) {
+                // write initial payload to variable-length header
+                ssc_memcpy_fast(&vheader[ptr], rdbuf->base, nread);
+                assert((ptr + nread) == vheader_length);
+            } else {
+                // write initial payload to session's temporary buffer
+                // and send it to remote server after handshake has been
+                // completed
+                ssc_memcpy_fast(s->tmpbuf, rdbuf->base, nread);
+                s->tmppos = nread;
+            }
 
             ok = ssc_crypto_encrypt(&s->crypto,
                                     &wrreq->buf.base[wrreq->buf.len], &encrypted_size,
@@ -298,7 +313,6 @@ static void client_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *r
             assert(ok);
             assert(encrypted_size == nread);
             wrreq->buf.len += encrypted_size + TAG_SIZE;
-            // ptr += encrypted_size + TAG_SIZE;
 
             uv_write((uv_write_t*) wrreq, (uv_stream_t*) &s->remote,
                      &wrreq->buf, 1, wrreq_put_buf_cb);
@@ -327,9 +341,9 @@ static void remote_read_cb(uv_stream_t *remote, ssize_t nread, const uv_buf_t *r
     if (nread == 0)
         goto ret;
 
-    long ok, decrypted_size = 0;
-    uint16_t payload_length = 0, ptr;
     ssc_write_req_t *wrreq;
+    uint16_t payload_length = 0, ptr;
+    int ok, encrypted_size, decrypted_size = 0;
 
     switch (s->remote_stage) {
         case REMOTE_STAGE_HANDSHAKE: {
@@ -353,23 +367,58 @@ static void remote_read_cb(uv_stream_t *remote, ssize_t nread, const uv_buf_t *r
             ptr += header_size + TAG_SIZE;
             payload_length = ntohs(*((uint16_t*) &resp_header[header_size - 2]));
 
-            wrreq = ssc_mempool_get(&wrreq_pool);
-            wrreq->buf = (uv_buf_t){
-                .base = ssc_mempool_get(&bufpool),
-                .len  = 0
-            };
+            if (SSC_UNLIKELY(s->tmppos > 0)) {
+                wrreq = ssc_mempool_get(&wrreq_pool);
+                wrreq->buf = (uv_buf_t){
+                    .base = ssc_mempool_get(&bufpool),
+                    .len  = 0
+                };
 
-            ok = ssc_crypto_decrypt(&s->crypto,
-                                    wrreq->buf.base, (long*) &wrreq->buf.len,
-                                    &rdbuf->base[ptr], payload_length,
-                                    &rdbuf->base[ptr + payload_length], TAG_SIZE,
-                                    NULL, 0);
-            assert(ok);
-            assert(payload_length == wrreq->buf.len);
+                uint16_t n_be16 = ssc_bswap16(s->tmppos);
+                ok = ssc_crypto_encrypt(&s->crypto,
+                                        wrreq->buf.base, &encrypted_size,
+                                        &wrreq->buf.base[sizeof(uint16_t)], TAG_SIZE,
+                                        &n_be16, sizeof(uint16_t),
+                                        NULL, 0);
+                assert(ok);
+                assert(encrypted_size == sizeof(uint16_t));
+                ptr = encrypted_size + TAG_SIZE;
+                wrreq->buf.len = ptr;
 
-            uv_write((uv_write_t*) wrreq, (uv_stream_t*) &s->client,
-                     &wrreq->buf, 1, wrreq_put_buf_cb);
-            LOGI("%s <-- (remote): wrote %ld bytes of first payload\n", s->addr_str, wrreq->buf.len);
+                ok = ssc_crypto_encrypt(&s->crypto,
+                                        &wrreq->buf.base[ptr], &encrypted_size,
+                                        &wrreq->buf.base[ptr + nread], TAG_SIZE,
+                                        s->tmpbuf, s->tmppos,
+                                        NULL, 0);
+                assert(ok);
+                assert(encrypted_size == nread);
+                wrreq->buf.len += encrypted_size + TAG_SIZE;
+
+                uv_write((uv_write_t*) wrreq, (uv_stream_t*) &s->remote,
+                         &wrreq->buf, 1, wrreq_put_buf_cb);
+                s->tmppos = 0;
+                LOGI("%s --> (remote): wrote %ld bytes of first payload\n", s->addr_str, wrreq->buf.len);
+            }
+
+            if (SSC_LIKELY(payload_length > 0)) {
+                wrreq = ssc_mempool_get(&wrreq_pool);
+                wrreq->buf = (uv_buf_t){
+                    .base = ssc_mempool_get(&bufpool),
+                    .len  = 0
+                };
+
+                ok = ssc_crypto_decrypt(&s->crypto,
+                                        wrreq->buf.base, (long*) &wrreq->buf.len,
+                                        &rdbuf->base[ptr], payload_length,
+                                        &rdbuf->base[ptr + payload_length], TAG_SIZE,
+                                        NULL, 0);
+                assert(ok);
+                assert(payload_length == wrreq->buf.len);
+
+                uv_write((uv_write_t*) wrreq, (uv_stream_t*) &s->client,
+                         &wrreq->buf, 1, wrreq_put_buf_cb);
+                LOGI("%s <-- (remote): wrote %ld bytes of first payload\n", s->addr_str, wrreq->buf.len);
+            }
 
             s->remote_stage++;
         }

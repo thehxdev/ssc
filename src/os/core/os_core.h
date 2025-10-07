@@ -7,6 +7,7 @@
 #include <string.h>
 #include <assert.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 dl_handle_t os_dlopen(const char *path);
 
