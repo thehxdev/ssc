@@ -3,8 +3,8 @@
 #include <openssl/bio.h>
 #include <openssl/evp.h>
 
-#if (OPENSSL_VERSION_MAJOR != 3) || (OPENSSL_VERSION_MINOR != 5)
-    #error "openssl version 3.5.x is expected"
+#if (OPENSSL_VERSION_MAJOR != 3)
+    #error "openssl version 3.x.x is expected"
 #endif
 
 #define HEXDUMP_FP stderr

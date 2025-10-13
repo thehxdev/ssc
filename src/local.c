@@ -587,10 +587,13 @@ int main(int argc, char *argv[]) {
     int err = 1;
     char *config_path;
 
-    if (argc != 2)
+    if (argc != 2) {
+        LOGI("using default config file path " DEFAULT_CONFIG_PATH "\n");
         config_path = DEFAULT_CONFIG_PATH;
-    else
+    } else {
         config_path = argv[1];
+        LOGI("reading config file from %s\n", config_path);
+    }
 
     arena_config_t aconf = ARENA_DEFAULT_CONFIG;
     aconf.flags   = ARENA_FIXED;
