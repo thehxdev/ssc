@@ -22,47 +22,46 @@ memory usage low and avoids memory fragmentation and null pointer crashes.
 
 
 ## Build
-SSC depends on these projects:
-- LibUV: As event loop implementation
-- OpenSSL: For encryption/decryption
-- BLAKE3: For sub-key derivation with random salt
+SSC depends on these libraries:
+- LibUV: As event loop implementation and I/O abstraction
+- OpenSSL: Encryption/Decryption
+- BLAKE3: Sub-key derivation with random salt
 
 ### Dependencies
-Build dependencies before building `ssc`. All dependencies will be installed on
-the project root directory and NOT system-wide.
-
-#### Unix-like
-On Unix-like systems use [`build-deps.bash`](build-deps.bash) to install all
-dependencies locally on project root directory.
-
-#### x64 Windows
-Use `vcpkg` to install dependencies on windows. Run these commands on project
-root directory:
-```powershell
+Use `vcpkg` to install dependencies. Run these commands on project root directory:
+```bash
 git clone --depth=1 "https://github.com/microsoft/vcpkg.git"
-cd .\vcpkg\
-.\bootstrap-vcpkg.bat
-.\vcpkg install openssl libuv blake3 --triplet x64-windows
-cd ..\
+cd ./vcpkg
+
+# Windows
+./bootstrap-vcpkg.bat
+
+# Unix
+./bootstrap-vcpkg.sh
+
+./vcpkg install openssl libuv blake3
+cd ..
 ```
 
 ### SSC
-Edit the [`config.c`](config.c) file. Then build the config and project using
-the build script. On Unix-like systems use [`build.bash`](build.bash) and on
-x64 Windows use [`build.bat`](build.bat) script.
+Then use `cmake` to build the project:
+```bash
+mkdir -p build ; cd build
 
-To rebuild the project just re-run the build script.
+cmake .. --fresh -DCMAKE_TOOLCHAIN_FILE:FILEPATH="../vcpkg/scripts/buildsystems/vcpkg.cmake"
 
+cmake --build .
+```
 
 ## Run
 Run the Shadowsocks client implementation (`ssc-local`):
 ```bash
 # Unix-like
-./_build/ssc-local ./_build/config.so
+./build/ssc-local ./build/config.so
 
 # Windows
-.\_build\ssc-local.exe .\_build\config.dll
+.\build\ssc-local.exe .\build\config.dll
 ```
 
 > [!NOTE]
-> Once you changed `config.c` file, run build script again.
+> Once you changed `config.c` file, rebuild project.

@@ -1,16 +1,16 @@
-#ifdef _MSC_VER
-    #pragma comment(lib, "Ws2_32.lib")
-    #pragma comment(lib, "user32.lib")
-    #pragma comment(lib, "advapi32.lib")
-    #pragma comment(lib, "iphlpapi.lib")
-    #pragma comment(lib, "shell32.lib")
-    #pragma comment(lib, "userenv.lib")
-    #pragma comment(lib, "psapi.lib")
+// #ifdef _MSC_VER
+//     #pragma comment(lib, "Ws2_32.lib")
+//     #pragma comment(lib, "user32.lib")
+//     #pragma comment(lib, "advapi32.lib")
+//     #pragma comment(lib, "iphlpapi.lib")
+//     #pragma comment(lib, "shell32.lib")
+//     #pragma comment(lib, "userenv.lib")
+//     #pragma comment(lib, "psapi.lib")
 
-    #pragma comment(lib, "blake3.lib")
-    #pragma comment(lib, "uv.lib")
-    #pragma comment(lib, "libcrypto.lib")
-#endif
+//     #pragma comment(lib, "blake3.lib")
+//     #pragma comment(lib, "uv.lib")
+//     #pragma comment(lib, "libcrypto.lib")
+// #endif
 
 #include <uv.h>
 

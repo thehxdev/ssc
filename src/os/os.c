@@ -1,7 +1,7 @@
-#if defined(SSC_OS_UNIX)
-    #include "os/core/os_core_unix.c"
-#elif defined(SSC_OS_WINDOWS)
+#ifdef _WIN32
     #include "os/core/os_core_windows.c"
+#else
+    #include "os/core/os_core_unix.c"
 #endif
 
 #include "os/core/os_core.c"

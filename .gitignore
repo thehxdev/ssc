@@ -1,5 +1,4 @@
-_deps/
-_build/
+build/
 .cache/
 keys/
 vcpkg/

@@ -1,10 +1,10 @@
 #ifndef _SSC_OS_H_
 #define _SSC_OS_H_
 
-#if defined(SSC_OS_UNIX)
-    #include "os/core/os_core_unix.h"
-#elif defined(SSC_OS_WINDOWS)
+#ifdef _WIN32
     #include "os/core/os_core_windows.h"
+#else
+    #include "os/core/os_core_unix.h"
 #endif
 
 #include "os/core/os_core.h"
