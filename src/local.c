@@ -3,7 +3,7 @@
 #ifdef _WIN32
     #define DEFAULT_CONFIG_PATH ".\\config.dll"
 #else
-    #define DEFAULT_CONFIG_PATH "./config.so"
+    #define DEFAULT_CONFIG_PATH "./libconfig.so"
 #endif
 
 enum {
