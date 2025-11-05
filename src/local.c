@@ -107,7 +107,7 @@ static void remote_connect_cb(uv_connect_t *req, int status);
 static void client_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *rdbuf) {
     ssc_write_req_t *wrreq;
     ssc_session_t *s = client->data;
-    int ok, encrypted_size, ptr = 0;
+    long ok, encrypted_size, ptr = 0;
 
     if (nread == UV_EOF) {
         goto failed;
@@ -347,7 +347,7 @@ static void remote_read_cb(uv_stream_t *remote, ssize_t nread, const uv_buf_t *r
 
     ssc_write_req_t *wrreq;
     uint16_t payload_length = 0, ptr;
-    int ok, encrypted_size, decrypted_size = 0;
+    long ok, encrypted_size, decrypted_size = 0;
 
     switch (s->remote_stage) {
         case REMOTE_STAGE_HANDSHAKE: {
