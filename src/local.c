@@ -196,89 +196,93 @@ static void client_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *r
             memcpy(wrreq->buf.base, s->salt, keysize);
             wrreq->buf.len += keysize;
 
-            //////
-            // begin fixed-length header
-            //////
-            ssc_fixed_header_t fixed_header;
-
-            // set fixed-length header's type.
-            // request streams has type 0.
-            fixed_header.type = 0;
-
-            // big endian timestamp
-            fixed_header.timestamp = ssc_bswap64((uint64_t)time(NULL));
-
-            // set length field (variable-length header length) in fixed-length header
+            uint16_t padding_length;
+            int vheader_length;
             bool with_initial_payload = true;
-            uint16_t padding_length = (rand() % 900) + 1;
-            int vheader_length = s->tmppos + sizeof(uint16_t) + padding_length + nread;
+            {
+                //////
+                // begin fixed-length header
+                //////
+                ssc_fixed_header_t fixed_header;
 
-            // This is a rare case
-            if (SSC_UNLIKELY(vheader_length > UINT16_MAX)) {
-                with_initial_payload = false;
-                vheader_length -= nread;
+                // set fixed-length header's type.
+                // request streams has type 0.
+                fixed_header.type = 0;
+
+                // big endian timestamp
+                fixed_header.timestamp = ssc_bswap64((uint64_t)time(NULL));
+
+                // set length field (variable-length header length) in fixed-length header
+                padding_length = (rand() % 900) + 1;
+                vheader_length = s->tmppos + sizeof(uint16_t) + padding_length + nread;
+
+                // This is a rare case
+                if (SSC_UNLIKELY(vheader_length > UINT16_MAX)) {
+                    with_initial_payload = false;
+                    vheader_length -= nread;
+                }
+
+                fixed_header.length = ssc_bswap16((uint16_t)vheader_length);
+
+                // encrypt and write fixed-length header and it's tag to request buffer
+                ok = ssc_crypto_encrypt(&s->crypto,
+                                        &wrreq->buf.base[wrreq->buf.len], &encrypted_size,
+                                        &wrreq->buf.base[wrreq->buf.len + sizeof(fixed_header)], TAG_SIZE,
+                                        &fixed_header, sizeof(fixed_header),
+                                        NULL, 0);
+                assert(ok);
+                assert(encrypted_size == sizeof(fixed_header));
+                wrreq->buf.len += sizeof(fixed_header) + TAG_SIZE;
+                //////
+                // end fixed-length header
+                //////
             }
 
-            fixed_header.length = ssc_bswap16((uint16_t)vheader_length);
+            {
+                //////
+                // begin variable-length header
+                //////
+                ptr = 0;
+                uint8_t *vheader = arena_alloc(gmem, vheader_length);
 
-            // encrypt and write fixed-length header and it's tag to request buffer
-            ok = ssc_crypto_encrypt(&s->crypto,
-                                    &wrreq->buf.base[wrreq->buf.len], &encrypted_size,
-                                    &wrreq->buf.base[wrreq->buf.len + sizeof(fixed_header)], TAG_SIZE,
-                                    &fixed_header, sizeof(fixed_header),
-                                    NULL, 0);
-            assert(ok);
-            assert(encrypted_size == sizeof(fixed_header));
-            wrreq->buf.len += sizeof(fixed_header) + TAG_SIZE;
-            //////
-            // end fixed-length header
-            //////
+                // set destination address type, address and port in variable-length header
+                ssc_memcpy_fast(vheader, s->tmpbuf, s->tmppos);
+                ptr += s->tmppos;
+                s->tmppos = 0;
 
+                // set padding length
+                *((uint16_t*)&vheader[ptr]) = ssc_bswap16(padding_length);
+                ptr += sizeof(uint16_t) + padding_length;
 
-            //////
-            // begin variable-length header
-            //////
-            ptr = 0;
-            uint8_t *vheader = arena_alloc(gmem, vheader_length);
+                if (SSC_LIKELY(with_initial_payload)) {
+                    // write initial payload to variable-length header
+                    ssc_memcpy_fast(&vheader[ptr], rdbuf->base, nread);
+                    assert((ptr + nread) == vheader_length);
+                } else {
+                    // write initial payload to session's temporary buffer
+                    // and send it to remote server after handshake has been
+                    // completed
+                    ssc_memcpy_fast(s->tmpbuf, rdbuf->base, nread);
+                    s->tmppos = nread;
+                }
 
-            // set destination address type, address and port in variable-length header
-            ssc_memcpy_fast(vheader, s->tmpbuf, s->tmppos);
-            ptr += s->tmppos;
-            s->tmppos = 0;
+                ok = ssc_crypto_encrypt(&s->crypto,
+                                        &wrreq->buf.base[wrreq->buf.len], &encrypted_size,
+                                        &wrreq->buf.base[wrreq->buf.len + vheader_length], TAG_SIZE,
+                                        vheader, vheader_length,
+                                        NULL, 0);
+                assert(ok);
+                assert(encrypted_size == vheader_length);
 
-            // set padding length
-            *((uint16_t*)&vheader[ptr]) = ssc_bswap16(padding_length);
-            ptr += sizeof(uint16_t) + padding_length;
-
-            if (SSC_LIKELY(with_initial_payload)) {
-                // write initial payload to variable-length header
-                ssc_memcpy_fast(&vheader[ptr], rdbuf->base, nread);
-                assert((ptr + nread) == vheader_length);
-            } else {
-                // write initial payload to session's temporary buffer
-                // and send it to remote server after handshake has been
-                // completed
-                ssc_memcpy_fast(s->tmpbuf, rdbuf->base, nread);
-                s->tmppos = nread;
+                wrreq->buf.len += vheader_length + TAG_SIZE;
+                arena_pop(gmem, vheader_length);
+                //////
+                // end variable-length header
+                //////
             }
 
-            ok = ssc_crypto_encrypt(&s->crypto,
-                                    &wrreq->buf.base[wrreq->buf.len], &encrypted_size,
-                                    &wrreq->buf.base[wrreq->buf.len + vheader_length], TAG_SIZE,
-                                    vheader, vheader_length,
-                                    NULL, 0);
-            assert(ok);
-            assert(encrypted_size == vheader_length);
-            wrreq->buf.len += vheader_length + TAG_SIZE;
-            //////
-            // end variable-length header
-            //////
-
-            assert(wrreq->buf.len == (keysize + sizeof(fixed_header) + TAG_SIZE + vheader_length + TAG_SIZE));
             uv_write((uv_write_t*) wrreq, (uv_stream_t*) &s->remote, &wrreq->buf, 1, wrreq_put_buf_cb);
             LOGI("%s --> (remote): wrote %ld bytes of ss handshake\n", s->addr_str, wrreq->buf.len);
-
-            arena_pop(gmem, vheader_length);
 
             s->remote_stage = REMOTE_STAGE_HANDSHAKE;
             uv_read_start((uv_stream_t*) &s->remote, buf_alloc_cb, remote_read_cb);
