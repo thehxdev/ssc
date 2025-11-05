@@ -27,5 +27,6 @@ target_link_libraries(
     libuv::uv
     BLAKE3::blake3
 )
+target_include_directories(ssc-local PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
 target_compile_definitions(ssc-local PRIVATE SSC_CRYPTO_OPENSSL)
 set_property(TARGET ssc-local PROPERTY C_STANDARD 11)
