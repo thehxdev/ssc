@@ -31,6 +31,8 @@ extern "C" {
 #include <string.h>
 #include "arena.h"
 
+#define ARENA_INITIAL_POS   sizeof(arena_t)
+
 // align up a number to a power-of-2 alignment
 #define arena_align_pow2(num, alignment) \
     ((((arena_uintptr_t)num) + ((alignment) - 1)) & (~((alignment) - 1)))
@@ -124,7 +126,7 @@ static inline arena_size_t arena_os_get_largepagesize(void) {
 #endif
 }
 
-arena_t *arena_new(arena_config_t *config) {
+arena_t *arena_new(const arena_config_t *config) {
     arena_t *a;
     arena_size_t pagesize, reserve, commit;
     int lp = config->flags & ARENA_LARGPAGES;
@@ -152,7 +154,7 @@ arena_t *arena_new(arena_config_t *config) {
     a->reserved = reserve;
 
     a->pos_base = 0;
-    a->pos = sizeof(*a);
+    a->pos = ARENA_INITIAL_POS;
     a->prev = NULL;
     a->current = a;
 
@@ -160,12 +162,12 @@ arena_t *arena_new(arena_config_t *config) {
 }
 
 void *arena_alloc_align(arena_t *arena, arena_size_t size, arena_size_t alignment) {
-    // allochdr_t *hdr;
     unsigned char *raw, *aligned;
     arena_t *current, *new_arena;
     arena_size_t padding;
 
-    if (size == 0)
+    // If size is zero or requested size is bigger than the arena return NULL
+    if (size == 0 || size > (arena->reserved - sizeof(*arena)))
         return NULL;
 
     current = arena->current;
@@ -207,17 +209,17 @@ void *arena_alloc_align(arena_t *arena, arena_size_t size, arena_size_t alignmen
     return aligned;
 }
 
-arena_size_t arena_pos(arena_t *arena) {
+arena_size_t arena_pos(const arena_t *arena) {
     return (arena->current->pos_base + arena->current->pos);
 }
 
-int arena_is_empty(arena_t *arena) {
-    return ((arena->current->prev == NULL) && (arena->pos == 0));
+int arena_is_empty(const arena_t *arena) {
+    return ((arena->current->pos_base == 0) && (arena->pos == ARENA_INITIAL_POS));
 }
 
 void arena_pop_to(arena_t *arena, arena_size_t pos) {
     arena_t *current = arena->current, *prev = NULL;
-    while (current->pos_base > pos) {
+    while (current->pos_base >= pos) {
         prev = current->prev;
         arena_os_release(current, current->reserved);
         current = prev;
@@ -227,19 +229,13 @@ void arena_pop_to(arena_t *arena, arena_size_t pos) {
 }
 
 void arena_pop(arena_t *arena, arena_size_t offset) {
-    // allochdr_t hdr;
-    // arena_t *current;
-
-    arena_size_t pos_curr = arena_pos(arena);
-
-    if (offset <= pos_curr)
-        arena_pop_to(arena, pos_curr - offset);
+    arena_size_t curr_pos = arena_pos(arena);
+    if (offset <= curr_pos)
+        arena_pop_to(arena, curr_pos - offset);
 }
 
 void arena_reset(arena_t *arena) {
-    arena_pop_to(arena, 0);
-    arena->current->pos = 0;
-    arena->current->prev = NULL;
+    arena_pop_to(arena, ARENA_INITIAL_POS);
 }
 
 void arena_destroy(arena_t *arena) {
@@ -253,12 +249,18 @@ void arena_destroy(arena_t *arena) {
 }
 
 void arena_scope_begin(arena_t *arena, arena_scope_t *scope_out) {
-    scope_out->arena = arena;
-    scope_out->__pos   = arena_pos(arena);
+    *scope_out = (arena_scope_t){
+        .arena = arena,
+        .pos = arena_pos(arena),
+    };
 }
 
-void arena_scope_end(arena_scope_t scope) {
-    arena_pop_to(scope.arena, scope.__pos);
+void arena_scope_end(arena_scope_t *scope) {
+    arena_pop_to(scope->arena, scope->pos);
+    *scope = (arena_scope_t){
+        .arena = NULL,
+        .pos = ARENA_INITIAL_POS,
+    };
 }
 
 #ifdef __cplusplus

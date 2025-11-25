@@ -11,10 +11,10 @@
  * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
- * 
+ *
  * The above copyright notice and this permission notice shall be included in all
  * copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -69,7 +69,7 @@ typedef struct arena {
 // restore the old state.
 typedef struct arena_scope {
     arena_t *arena;
-    arena_size_t __pos; // read-only
+    arena_size_t pos; // read-only
 } arena_scope_t;
 
 #define ARENA_KB(value) ((value) * 1024)
@@ -87,7 +87,7 @@ typedef struct arena_scope {
         .flags = ARENA_NONE \
     })
 
-arena_t *arena_new(arena_config_t *config);
+arena_t *arena_new(const arena_config_t *config);
 
 void arena_destroy(arena_t *arena);
 
@@ -100,10 +100,10 @@ void *arena_alloc_align(arena_t *arena, arena_size_t size, arena_size_t alignmen
     arena_alloc_align((arena), (size), (arena)->config.alignment)
 
 // Is arena empty?
-int arena_is_empty(arena_t *arena);
+int arena_is_empty(const arena_t *arena);
 
 // Get total bytes allocated
-arena_size_t arena_pos(arena_t *arena);
+arena_size_t arena_pos(const arena_t *arena);
 
 // Set arena's position to a position specified by pos
 void arena_pop_to(arena_t *arena, arena_size_t pos);
@@ -120,7 +120,7 @@ void arena_reset(arena_t *arena);
 void arena_scope_begin(arena_t *arena, arena_scope_t *scope_out);
 
 // Restore an arena's state from an snapshot.
-void arena_scope_end(arena_scope_t scope);
+void arena_scope_end(arena_scope_t *scope);
 
 #ifdef __cplusplus
 }
