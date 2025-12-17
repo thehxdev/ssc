@@ -28,10 +28,12 @@
 extern "C" {
 #endif
 
+#include <assert.h>
 #include <string.h>
 #include "arena.h"
 
-#define ARENA_INITIAL_POS   sizeof(arena_t)
+#define ARENA_ASSERT(cond)  assert((cond))
+#define ARENA_HEADER_SIZE   (128)
 
 // align up a number to a power-of-2 alignment
 #define arena_align_pow2(num, alignment) \
@@ -46,7 +48,7 @@ extern "C" {
 
 // validate that `arena_uintptr_t` can hold a pointer
 __arena_static_assert((sizeof(arena_uintptr_t) == sizeof(void*)), validate_uintptr_size);
-
+__arena_static_assert((sizeof(arena_t) <= ARENA_HEADER_SIZE), validate_arena_header_size);
 
 #if defined(__linux__) /* linux */ \
     || (defined(__APPLE__) && defined(__MACH__)) /* apple */ \
@@ -140,6 +142,7 @@ arena_t *arena_new(const arena_config_t *config) {
     a = (arena_t*) arena_os_reserve(reserve, lp);
     if (!a)
         return NULL;
+
     if (!arena_os_commit(a, commit, lp)) {
         arena_os_release(a, reserve);
         return NULL;
@@ -154,7 +157,7 @@ arena_t *arena_new(const arena_config_t *config) {
     a->reserved = reserve;
 
     a->pos_base = 0;
-    a->pos = ARENA_INITIAL_POS;
+    a->pos = ARENA_HEADER_SIZE;
     a->prev = NULL;
     a->current = a;
 
@@ -162,20 +165,18 @@ arena_t *arena_new(const arena_config_t *config) {
 }
 
 void *arena_alloc_align(arena_t *arena, arena_size_t size, arena_size_t alignment) {
-    unsigned char *raw, *aligned;
     arena_t *current, *new_arena;
-    arena_size_t padding;
+    arena_uintptr_t pos_pre, pos_past;
 
-    // If size is zero or requested size is bigger than the arena return NULL
-    if (size == 0 || size > (arena->reserved - sizeof(*arena)))
+    // If size is zero or requested size is bigger than the arena's capacity, return NULL
+    if (size == 0 || size > (arena->reserved - ARENA_HEADER_SIZE))
         return NULL;
 
     current = arena->current;
-    raw = (unsigned char*)current + current->pos;
-    aligned = (unsigned char*) arena_align_pow2(raw, alignment);
-    padding = aligned - raw;
+    pos_pre = arena_align_pow2(current->pos, alignment);
+    pos_past = pos_pre + size;
 
-    if ((size + padding) > (current->reserved - current->pos)) {
+    if (pos_past > current->reserved) {
         if (current->config.flags & ARENA_FIXED)
             return NULL;
 
@@ -188,14 +189,12 @@ void *arena_alloc_align(arena_t *arena, arena_size_t size, arena_size_t alignmen
 
         // reinitialize allocation info
         current = new_arena;
-        raw = (unsigned char*)current + current->pos;
-        aligned = (unsigned char*) arena_align_pow2(raw, alignment);
-        padding = aligned - raw;
+        pos_pre = arena_align_pow2(current->pos, alignment);
+        pos_past = pos_pre + size;
     }
-    current->pos += size + padding;
 
     // commit new pages if needed
-    if (current->pos > current->commited) {
+    if (pos_past > current->commited) {
         // Since "reserve" and "commit" fields in arena config are already
         // aligned by operating system's page size, the "commit" field is
         // divisible by "reserve" field. So we can divied the arena's buffer to
@@ -206,26 +205,33 @@ void *arena_alloc_align(arena_t *arena, arena_size_t size, arena_size_t alignmen
         current->commited += current->config.commit;
     }
 
-    return aligned;
+    current->pos = pos_past;
+    return ((unsigned char*)current + pos_pre);
 }
 
 arena_size_t arena_pos(const arena_t *arena) {
-    return (arena->current->pos_base + arena->current->pos);
+    arena_t *current = arena->current;
+    return (current->pos_base + current->pos);
 }
 
 int arena_is_empty(const arena_t *arena) {
-    return ((arena->current->pos_base == 0) && (arena->pos == ARENA_INITIAL_POS));
+    return (arena_pos(arena) == ARENA_HEADER_SIZE);
 }
 
 void arena_pop_to(arena_t *arena, arena_size_t pos) {
-    arena_t *current = arena->current, *prev = NULL;
+    arena_size_t new_pos;
+    arena_t *current = arena->current, *prev;
+    pos = (pos > ARENA_HEADER_SIZE) ? pos : ARENA_HEADER_SIZE;
     while (current->pos_base >= pos) {
         prev = current->prev;
         arena_os_release(current, current->reserved);
         current = prev;
     }
+    current->prev = NULL;
     arena->current = current;
-    current->pos = pos - current->pos_base;
+    new_pos = pos - current->pos_base;
+    ARENA_ASSERT(new_pos <= current->pos);
+    current->pos = new_pos;
 }
 
 void arena_pop(arena_t *arena, arena_size_t offset) {
@@ -235,7 +241,7 @@ void arena_pop(arena_t *arena, arena_size_t offset) {
 }
 
 void arena_reset(arena_t *arena) {
-    arena_pop_to(arena, ARENA_INITIAL_POS);
+    arena_pop_to(arena, 0);
 }
 
 void arena_destroy(arena_t *arena) {
@@ -257,10 +263,7 @@ void arena_scope_begin(arena_t *arena, arena_scope_t *scope_out) {
 
 void arena_scope_end(arena_scope_t *scope) {
     arena_pop_to(scope->arena, scope->pos);
-    *scope = (arena_scope_t){
-        .arena = NULL,
-        .pos = ARENA_INITIAL_POS,
-    };
+    memset(scope, 0, sizeof(*scope));
 }
 
 #ifdef __cplusplus
