@@ -34,13 +34,24 @@ extern "C" {
 #include <stddef.h>
 #include <stdint.h>
 
-#define arena_intptr_t  intptr_t
-#define arena_uintptr_t uintptr_t
-#define arena_size_t    size_t
+typedef size_t arena_size_t;
 
-#ifndef ARENA_DEFAULT_ALIGNMENT
-    #define ARENA_DEFAULT_ALIGNMENT sizeof(arena_uintptr_t)
-#endif
+#define ARENA_KB(value) ((value) * 1024)
+#define ARENA_MB(value) (ARENA_KB(value) * 1024)
+#define ARENA_GB(value) (ARENA_MB(value) * 1024)
+
+#define ARENA_DEFAULT_ALIGNMENT     (sizeof(void*) << 1)
+#define ARENA_DEFAULT_RESERVE_SIZE  ARENA_MB(16)
+#define ARENA_DEFAULT_COMMIT_SIZE   ARENA_KB(16)
+
+#define ARENA_DEFAULT_CONFIG \
+    ((arena_config_t){ \
+        .reserve = ARENA_DEFAULT_RESERVE_SIZE, \
+        .commit = ARENA_DEFAULT_COMMIT_SIZE, \
+        .alignment = ARENA_DEFAULT_ALIGNMENT, \
+        .flags = ARENA_NONE \
+    })
+
 
 enum {
     ARENA_NONE = 0,
@@ -71,21 +82,6 @@ typedef struct arena_scope {
     arena_t *arena;
     arena_size_t pos; // read-only
 } arena_scope_t;
-
-#define ARENA_KB(value) ((value) * 1024)
-#define ARENA_MB(value) (ARENA_KB(value) * 1024)
-#define ARENA_GB(value) (ARENA_MB(value) * 1024)
-
-#define ARENA_DEFAULT_RESERVE_SIZE ARENA_MB(16)
-#define ARENA_DEFAULT_COMMIT_SIZE  ARENA_KB(16)
-
-#define ARENA_DEFAULT_CONFIG \
-    ((arena_config_t){ \
-        .reserve = ARENA_DEFAULT_RESERVE_SIZE, \
-        .commit = ARENA_DEFAULT_COMMIT_SIZE, \
-        .alignment = ARENA_DEFAULT_ALIGNMENT, \
-        .flags = ARENA_NONE \
-    })
 
 arena_t *arena_new(const arena_config_t *config);
 

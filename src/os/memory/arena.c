@@ -32,13 +32,6 @@ extern "C" {
 #include <string.h>
 #include "arena.h"
 
-#define ARENA_ASSERT(cond)  assert((cond))
-#define ARENA_HEADER_SIZE   (128)
-
-// align up a number to a power-of-2 alignment
-#define arena_align_pow2(num, alignment) \
-    ((((arena_uintptr_t)num) + ((alignment) - 1)) & (~((alignment) - 1)))
-
 // static_assert implementation in C89 and C99!
 // Learned this from "https://github.com/EpicGamesExt/raddebugger"
 #define __arena_concat_(A,B) A##B
@@ -46,9 +39,15 @@ extern "C" {
 #define __arena_static_assert(condition, id) \
     extern char __arena_concat(id, __LINE__)[ ((condition)) ? 1 : -1 ]
 
-// validate that `arena_uintptr_t` can hold a pointer
-__arena_static_assert((sizeof(arena_uintptr_t) == sizeof(void*)), validate_uintptr_size);
+#define ARENA_ASSERT(cond)  assert((cond))
+
+#define ARENA_HEADER_SIZE   (128)
 __arena_static_assert((sizeof(arena_t) <= ARENA_HEADER_SIZE), validate_arena_header_size);
+
+// align up a number to a power-of-2 alignment
+#define arena_align_pow2(num, alignment) \
+    ((((uintptr_t)num) + ((alignment) - 1)) & (~((alignment) - 1)))
+
 
 #if defined(__linux__) /* linux */ \
     || (defined(__APPLE__) && defined(__MACH__)) /* apple */ \
@@ -72,7 +71,7 @@ __arena_static_assert((sizeof(arena_t) <= ARENA_HEADER_SIZE), validate_arena_hea
 #endif
 
 // ask operating system for memory
-static void *arena_os_reserve(arena_size_t size, int with_large_pages) {
+static void *arena_os_mem_reserve(arena_size_t size, int with_large_pages) {
     void *p; int wlp;
 #ifdef ARENA_PLAT_UNIX
     wlp = (with_large_pages) ? MAP_HUGETLB : 0;
@@ -87,7 +86,7 @@ static void *arena_os_reserve(arena_size_t size, int with_large_pages) {
 }
 
 // commit a page (prepare it for read/write)
-static int arena_os_commit(void *p, arena_size_t size, int with_large_pages) {
+static inline int arena_os_mem_commit(void *p, arena_size_t size, int with_large_pages) {
 #ifdef ARENA_PLAT_UNIX
     (void)with_large_pages;
     return (mprotect(p, size, PROT_READ | PROT_WRITE) == 0);
@@ -99,7 +98,7 @@ static int arena_os_commit(void *p, arena_size_t size, int with_large_pages) {
 }
 
 // release an reserved memory block
-static void arena_os_release(void *p, arena_size_t size) {
+static inline void arena_os_mem_release(void *p, arena_size_t size) {
 #ifdef ARENA_PLAT_UNIX
     munmap(p, size);
 #else
@@ -139,12 +138,12 @@ arena_t *arena_new(const arena_config_t *config) {
     reserve = arena_align_pow2(config->reserve, pagesize);
     commit = arena_align_pow2(config->commit, pagesize);
 
-    a = (arena_t*) arena_os_reserve(reserve, lp);
+    a = (arena_t*) arena_os_mem_reserve(reserve, lp);
     if (!a)
         return NULL;
 
-    if (!arena_os_commit(a, commit, lp)) {
-        arena_os_release(a, reserve);
+    if (!arena_os_mem_commit(a, commit, lp)) {
+        arena_os_mem_release(a, reserve);
         return NULL;
     }
 
@@ -166,7 +165,10 @@ arena_t *arena_new(const arena_config_t *config) {
 
 void *arena_alloc_align(arena_t *arena, arena_size_t size, arena_size_t alignment) {
     arena_t *current, *new_arena;
-    arena_uintptr_t pos_pre, pos_past;
+    arena_size_t pos_pre, pos_past;
+
+    // assert that alignment is a power of 2
+    ARENA_ASSERT((alignment & (alignment - 1)) == 0);
 
     // If size is zero or requested size is bigger than the arena's capacity, return NULL
     if (size == 0 || size > (arena->reserved - ARENA_HEADER_SIZE))
@@ -199,9 +201,9 @@ void *arena_alloc_align(arena_t *arena, arena_size_t size, arena_size_t alignmen
         // aligned by operating system's page size, the "commit" field is
         // divisible by "reserve" field. So we can divied the arena's buffer to
         // blocks with "commit" size each.
-        arena_os_commit((unsigned char*)current + current->commited,
-                        current->config.commit,
-                        current->config.flags & ARENA_LARGPAGES);
+        arena_os_mem_commit((unsigned char*)current + current->commited,
+                            current->config.commit,
+                            current->config.flags & ARENA_LARGPAGES);
         current->commited += current->config.commit;
     }
 
@@ -224,7 +226,7 @@ void arena_pop_to(arena_t *arena, arena_size_t pos) {
     pos = (pos > ARENA_HEADER_SIZE) ? pos : ARENA_HEADER_SIZE;
     while (current->pos_base >= pos) {
         prev = current->prev;
-        arena_os_release(current, current->reserved);
+        arena_os_mem_release(current, current->reserved);
         current = prev;
     }
     current->prev = NULL;
@@ -249,7 +251,7 @@ void arena_destroy(arena_t *arena) {
     current = arena->current;
     while (current) {
         prev = current->prev;
-        arena_os_release(current, current->reserved);
+        arena_os_mem_release(current, current->reserved);
         current = prev;
     }
 }
@@ -263,7 +265,10 @@ void arena_scope_begin(arena_t *arena, arena_scope_t *scope_out) {
 
 void arena_scope_end(arena_scope_t *scope) {
     arena_pop_to(scope->arena, scope->pos);
-    memset(scope, 0, sizeof(*scope));
+    *scope = (arena_scope_t){
+        .arena = NULL,
+        .pos = 0,
+    };
 }
 
 #ifdef __cplusplus
