@@ -6,17 +6,17 @@ project(
     LANGUAGES C
 )
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE INTERNAL "")
+if(CMAKE_EXPORT_COMPILE_COMMANDS)
+    set(CMAKE_C_STANDARD_INCLUDE_DIRECTORIES
+      ${CMAKE_C_IMPLICIT_INCLUDE_DIRECTORIES})
+endif()
+
 find_package(OpenSSL REQUIRED)
 find_package(BLAKE3 REQUIRED)
 find_package(libuv REQUIRED)
 
 set(SSC_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
-
-add_library(
-    config
-    SHARED
-    "${CMAKE_CURRENT_SOURCE_DIR}/config.c"
-)
 
 add_executable(
     ssc-local

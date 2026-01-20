@@ -1,42 +1,43 @@
-#define __dlsym_ex(handle, name) \
-    tmp = os_dlsym((handle), (name)); \
-    if (!tmp) { \
-        fprintf(stderr, "os_dlsym failed to fetch %s\n", name); \
-        goto ret_close_handle; \
-    }
+#include <string.h>
+#include "config.h"
+#include "sth/sth.h"
+#include "cJSON/cJSON.h"
 
-int ssc_config_readall(arena_t *arena, const char *dlpath, struct ssc_config *config) {
-    int ok = 0, i;
-    void *handle, *tmp;
-    handle = os_dlopen(dlpath);
-    if (!handle) {
-        fprintf(stderr, "%s\n", os_dlerror());
+static const char *sf_map[_CONFIG_SF_COUNT] = {
+    [CONFIG_LISTEN_ADDR] = "listen_addr",
+    [CONFIG_REMOTE_ADDR] = "remote_addr",
+    [CONFIG_METHOD]      = "method",
+    [CONFIG_PASSWORD]    = "password",
+};
+
+int ssc_config_read(sth_arena_t *arena, const char *path, ssc_config_t *config) {
+    cJSON *j;
+    int i, ok = 1;
+
+    size_t config_size = 0;
+    char *config_string = sth_io_file_read_all(path, &config_size);
+    if (!config_string) {
+        ok = 0;
         goto ret;
     }
 
-    // dont want to keep the dynamic library open so I used strdup
-    // to keep pointer's data and close dynamic library.
-    const char *strs[_CONFIG_SF_COUNT] = {
-        [CONFIG_LISTEN_ADDR] = "listen_addr",
-        [CONFIG_REMOTE_ADDR] = "remote_addr",
-        [CONFIG_METHOD] = "method",
-        [CONFIG_PASSWORD] = "password",
-    };
-    for (i = 0; i < _CONFIG_SF_COUNT; ++i) {
-        __dlsym_ex(handle, strs[i]);
-        config->sf[i] = arena_alloc(arena, strlen(tmp)+1);
-        strcpy(config->sf[i], tmp);
+    cJSON *config_json = cJSON_ParseWithLength(config_string, config_size);
+    if (!config_json) {
+        ok = 0;
+        goto ret_free_config_string;
     }
 
-    __dlsym_ex(handle, "listen_port");
-    config->listen_port = *(uint16_t*)tmp;
+    for (int i = 0; i < _CONFIG_SF_COUNT; i++) {
+        const char *s = cJSON_GetObjectItem(config_json, sf_map[i])->valuestring;
+        config->sf[i] = sth_arena_strndup(arena, s, strlen(s));
+    }
 
-    __dlsym_ex(handle, "remote_port");
-    config->remote_port = *(uint16_t*)tmp;
+    config->listen_port = cJSON_GetObjectItem(config_json, "listen_port")->valuedouble;
+    config->remote_port = cJSON_GetObjectItem(config_json, "remote_port")->valuedouble;
+    cJSON_free(config_json);
 
-    ok = 1;
-ret_close_handle:
-    os_dlclose(handle);
+ret_free_config_string:
+    STH_BASE_FREE(config_string);
 ret:
     return ok;
 }

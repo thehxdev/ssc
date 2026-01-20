@@ -1,0 +1,8 @@
+{
+    "listen_addr": "127.0.0.1",
+    "listen_port": 1080,
+    "remote_addr": "127.0.0.1",
+    "remote_port": 2080,
+    "method": "2022-blake3-aes-256-gcm",
+    "password": "BobTwUxsQsNeuOS2PW5CgYBsRPdQMxYpLDJsffr4KZc="
+}

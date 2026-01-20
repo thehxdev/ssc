@@ -5,20 +5,18 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include <uv.h>
-
-#include "os/os.h"
-#include "base/base.h"
-#include "encoding/encoding.h"
+#define STH_STRIP_PREFIX
+#include "sth/sth.h"
+#include "cJSON/cJSON.h"
 #include "crypto/crypto.h"
 #include "log.h"
 #include "socks5.h"
 #include "config.h"
-#include "ss/ss.h"
+#include "ss.h"
+#include "ssc.h"
 
-#include "os/os.c"
-#include "base/base.c"
-#include "encoding/encoding.c"
+#include "sth/sth.c"
+#include "cJSON/cJSON.c"
 #include "crypto/crypto.c"
 #include "config.c"
 #include "local.c"

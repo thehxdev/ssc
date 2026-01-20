@@ -10,13 +10,13 @@ enum {
     _CONFIG_SF_COUNT,
 };
 
-struct ssc_config {
+typedef struct {
     // string fields
     char *sf[_CONFIG_SF_COUNT];
     uint16_t listen_port;
     uint16_t remote_port;
-};
+} ssc_config_t;
 
-int ssc_config_readall(arena_t *arena, const char *dlpath, struct ssc_config *config);
+int ssc_config_read(sth_arena_t *arena, const char *path, ssc_config_t *config);
 
 #endif // _SSC_H_

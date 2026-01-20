@@ -1,3 +1,4 @@
+#include "../sth/sth.h"
 #include <blake3.h>
 
 #define BLAKE3_KEY_DERIVATION_CONTEXT "shadowsocks 2022 session subkey"
@@ -13,8 +14,7 @@ static const cipher_info_t supported_ciphers[] = {
     { "2022-blake3-aes-256-gcm", "AES-256-GCM", 32 },
 };
 
-static const long n_supported_ciphers = \
-    sizeof(supported_ciphers) / sizeof(*supported_ciphers);
+static const long n_supported_ciphers = STH_BASE_ARRAY_LEN(supported_ciphers);
 
 static inline void iv_inc(unsigned char *iv) {
     uint32_t *high;
