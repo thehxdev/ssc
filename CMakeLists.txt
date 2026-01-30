@@ -22,6 +22,13 @@ add_executable(
     ssc-local
     "${SSC_SRC_DIR}/local_build.c"
 )
+
+target_include_directories(
+    ssc-local
+    PRIVATE
+    "${SSC_SRC_DIR}"
+)
+
 target_link_libraries(
     ssc-local
     PRIVATE
@@ -29,6 +36,6 @@ target_link_libraries(
     "$<IF:$<BOOL:${WIN32}>,libuv::uv,libuv::uv_a>"
     BLAKE3::blake3
 )
-target_include_directories(ssc-local PRIVATE "${SSC_SRC_DIR}")
+
 target_compile_definitions(ssc-local PRIVATE SSC_CRYPTO_OPENSSL)
 set_property(TARGET ssc-local PROPERTY C_STANDARD 11)
