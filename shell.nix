@@ -20,6 +20,7 @@ in
 
         packages = with pkgs; [
             gdb
+            clang-tools
         ];
 
         shellHook = ''
