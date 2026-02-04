@@ -2,6 +2,15 @@
 extern "C" {
 #endif
 
+int sth_os_file_size(const char *path, size_t *size_out) {
+    struct stat statbuf;
+    if (stat(path, &statbuf) < 0) {
+        return STH_FAILED;
+    }
+    *size_out = statbuf.st_size;
+    return STH_OK;
+}
+
 int sth_os_file_exists(const char *path) {
     struct stat statbuf;
     if (stat(path, &statbuf) < 0) {

@@ -5,6 +5,8 @@
 extern "C" {
 #endif
 
+int sth_os_file_size(const char *path, size_t *size_out);
+
 int sth_os_file_exists(const char *path);
 
 int sth_os_rename(const char *old_path, const char *new_path);

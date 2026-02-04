@@ -12,12 +12,13 @@ extern "C" {
 #define STH_ARENA_DEFAULT_RESERVE_SIZE  STH_BASE_MB(16)
 #define STH_ARENA_DEFAULT_COMMIT_SIZE   STH_BASE_KB(16)
 
-#define STH_ARENA_DEFAULT_CONFIG \
+#define STH_ARENA_DEFAULT_CONFIG(...) \
     ((sth_arena_config_t){ \
         .reserve = STH_ARENA_DEFAULT_RESERVE_SIZE, \
         .commit = STH_ARENA_DEFAULT_COMMIT_SIZE, \
         .alignment = STH_ARENA_DEFAULT_ALIGNMENT, \
-        .flags = STH_ARENA_NONE \
+        .flags = STH_ARENA_NONE, \
+        ##__VA_ARGS__ \
     })
 
 enum {
