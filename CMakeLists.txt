@@ -33,7 +33,7 @@ target_link_libraries(
     ssc-local
     PRIVATE
     OpenSSL::Crypto
-    "$<IF:$<BOOL:${WIN32}>,libuv::uv,libuv::uv_a>"
+    $<IF:$<TARGET_EXISTS:libuv::uv_a>,libuv::uv_a,libuv::uv>
     BLAKE3::blake3
 )
 
