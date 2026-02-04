@@ -14,6 +14,7 @@ in
             gcc
             gnumake
             cmake
+            pkg-config
         ];
 
         buildInputs = dependencyLibraries;
