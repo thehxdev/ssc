@@ -1,6 +1,8 @@
 #ifndef _SSC_SOCKS5_H_
 #define _SSC_SOCKS5_H_
 
+#define SOCKS5_MAX_ADDR_SIZE (1 + 256 + 2)
+
 enum {
     SOCKS5_Version  = 0x05,
     SOCKS5_Reserved = 0x00
@@ -38,5 +40,7 @@ enum {
     SOCKS5_CommandNotSupported,
     SOCKS5_AddressTypeNotSupported,
 };
+
+int ssc_socks5_validate_auth_methods(unsigned char *bytes, size_t size);
 
 #endif // _SSC_SOCKS5_H_

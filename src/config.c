@@ -1,8 +1,3 @@
-#include <string.h>
-#include "config.h"
-#include "sth/sth.h"
-#include "cJSON/cJSON.h"
-
 static const char *sf_map[_CONFIG_SF_COUNT] = {
     [CONFIG_LISTEN_ADDR] = "listen_addr",
     [CONFIG_REMOTE_ADDR] = "remote_addr",

@@ -4,15 +4,13 @@
 #include <stddef.h>
 
 #define IV_SIZE 12
-#define TAG_SIZE 16
+#define CRYPTO_TAG_SIZE 16
 #define AES_MAX_KEY_SIZE 32
 #define BLAKE3_KEY_SIZE  32
 
 typedef void ssc_crypto_ctx;
 typedef void ssc_crypto_cipher;
 
-// NOTE: If the order of fields are changed, function 'ssc_crypto_deinit'
-// probably needs modifications too.
 typedef struct ssc_crypto {
     ssc_crypto_ctx *ctx;
     ssc_crypto_cipher *cipher;

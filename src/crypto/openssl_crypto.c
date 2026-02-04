@@ -111,7 +111,7 @@ int ssc_crypto_deinit(ssc_crypto_t *self) {
         return 0;
     EVP_CIPHER_CTX_free(self->ctx);
     self->ctx = NULL;
-    memset(self->enc_subkey, 0, (BLAKE3_OUT_LEN * 2) + (IV_SIZE * 2));
+    memset(self, 0, sizeof(*self));
     return 1;
 }
 

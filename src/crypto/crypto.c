@@ -1,4 +1,3 @@
-#include "../sth/sth.h"
 #include <blake3.h>
 
 #define BLAKE3_KEY_DERIVATION_CONTEXT "shadowsocks 2022 session subkey"
